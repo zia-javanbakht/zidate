@@ -173,6 +173,14 @@ export async function respond(user, convo, rawText, engine = pickEngine()) {
   return say(convo, reply, next);
 }
 
+// Ask the next queued question straight away, e.g. after "That's not me".
+// The question that was pending goes back into the pool.
+export function askNow(user, convo) {
+  if (convo.pending?.id) convo.asked = convo.asked.filter((id) => id !== convo.pending.id);
+  const q = nextQuestion(user, convo);
+  return say(convo, q.text, q);
+}
+
 export function queueEvent(convo, event) {
   // One question per person per week is plenty; drop duplicates.
   if (convo.events.some((e) => e.candidateId === event.candidateId && e.type === event.type)) return;

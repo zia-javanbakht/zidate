@@ -367,7 +367,14 @@ async function profile() {
   }
 
   const traits = hidden.traits.map((t) => h('div', { class: 'trait' },
-    h('div', { class: 'label' }, h('span', {}, t.key[0].toUpperCase() + t.key.slice(1)), h('span', { class: 'muted' }, t.label)),
+    h('div', { class: 'label' },
+      h('span', {}, t.key[0].toUpperCase() + t.key.slice(1)),
+      h('span', { class: 'muted' }, t.label,
+        t.confidence >= 0.15 ? h('button', { class: 'link small fix', 'aria-label': `${t.key} is not right`, onclick: async () => {
+          await api('POST', `/api/profile/traits/${t.key}/recheck`);
+          toast('Got it. I will ask you about that next.');
+          location.hash = '#/talk';
+        } }, 'Not me') : null)),
     h('div', { class: `bar ${t.confidence < 0.15 ? 'unsure' : ''}`, 'aria-hidden': 'true' }, h('i', { style: `left:${t.value * 100}%` }))));
 
   const signOut = h('button', { class: 'btn ghost', onclick: async () => { await api('POST', '/api/logout'); me = null; location.hash = '#/welcome'; } }, 'Sign out');

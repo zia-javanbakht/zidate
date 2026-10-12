@@ -4,8 +4,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hashPassword, verifyPassword, newToken, parseCookies } from './auth.js';
 import { emptyHidden } from './traits.js';
-import { respond, opening, newConversation, queueEvent, pickEngine } from './agent/index.js';
-import { completeness, isReady, describeHidden, publicProfile, cleanText, blendTrait, hasContactInfo } from './profile.js';
+import { respond, opening, newConversation, queueEvent, pickEngine, askNow } from './agent/index.js';
+import { basicsDone, completeness, isReady, describeHidden, publicProfile, cleanText, blendTrait, hasContactInfo } from './profile.js';
 import { weeklyPicks, matchId, compatibility } from './matching.js';
 import { weekKey, now } from './clock.js';
 import { TRAIT_KEYS } from './traits.js';
@@ -248,6 +248,18 @@ export function createApp(store, { secureCookies = false, limits = LIMITS } = {}
     user.shared.bio = bio;
     if (body.useDraft) user.shared.bioDraft = '';
     return { body: { bio: user.shared.bio } };
+  });
+
+  // "That's not me": forget most of what we inferred and ask directly.
+  route('POST', '/api/profile/traits/:key/recheck', async ({ user, params }) => {
+    const t = user.hidden.traits[params.key];
+    if (!t) throw new HttpError(404, 'Not found.');
+    user.hidden.traits[params.key] = { value: 0.5, confidence: t.confidence * 0.3 };
+    const convo = store.data.conversations[user.id];
+    convo.events = convo.events.filter((e) => !(e.type === 'recheck' && e.trait === params.key));
+    convo.events.unshift({ type: 'recheck', trait: params.key });
+    if (basicsDone(user)) askNow(user, convo);
+    return { body: { ok: true } };
   });
 
   route('DELETE', '/api/profile/interests/:name', async ({ user, params }) => {

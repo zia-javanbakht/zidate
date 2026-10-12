@@ -153,6 +153,8 @@ export const QUESTIONS = [
   },
 ];
 
+import { TRAITS } from '../traits.js';
+
 // Asked after the person reacts to a weekly suggestion. Answers update preferences.
 export function feedbackQuestion(event) {
   if (event.type === 'pass') {
@@ -161,8 +163,25 @@ export function feedbackQuestion(event) {
   if (event.type === 'like') {
     return { id: `fb_${event.candidateId}`, mode: 'partner', text: `You liked ${event.name}. What caught your eye?` };
   }
+  if (event.type === 'recheck' && TRAITS[event.trait]) {
+    const t = TRAITS[event.trait];
+    return {
+      id: `rc_${event.trait}`, mode: 'self',
+      text: `You said I got something wrong. Help me fix it: which sounds more like you?`,
+      traits: [event.trait],
+      choices: [
+        { label: cap(t.low), ack: 'Thank you, fixed.', set: { [event.trait]: 0.15 } },
+        { label: 'Somewhere in between', ack: 'Thank you, fixed.', set: { [event.trait]: 0.5 } },
+        { label: cap(t.high), ack: 'Thank you, fixed.', set: { [event.trait]: 0.85 } },
+      ],
+    };
+  }
   if (event.type === 'match') {
     return { id: `fbm_${event.candidateId}`, mode: 'partner', text: `You and ${event.name} matched. Once you have talked a bit, tell me how it feels.` };
   }
   return null;
+}
+
+function cap(s) {
+  return s[0].toUpperCase() + s.slice(1);
 }

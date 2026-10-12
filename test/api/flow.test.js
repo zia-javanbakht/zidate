@@ -197,3 +197,18 @@ test('someone who passed on you, or unmatched you, is never suggested to you', a
   assert.ok(meA);
   await s3.close();
 });
+
+test('"Not me" on a trait makes the interviewer ask about it directly', async () => {
+  const c = client(srv.base);
+  const { me } = await onboard(c);
+  const u = srv.store.data.users[me.id];
+  const before = u.hidden.traits.social.confidence;
+  assert.equal((await c.post('/api/profile/traits/social/recheck')).status, 200);
+  assert.ok(u.hidden.traits.social.confidence < before);
+  const q = (await c.get('/api/chat')).data.messages.at(-1);
+  assert.match(q.text, /which sounds more like you/);
+  assert.deepEqual(q.choices, ['Recharges alone', 'Somewhere in between', 'Energised by people']);
+  await c.post('/api/chat', { text: 'Recharges alone' });
+  assert.ok(u.hidden.traits.social.value < 0.3);
+  assert.equal((await c.post('/api/profile/traits/nope/recheck')).status, 404);
+});
