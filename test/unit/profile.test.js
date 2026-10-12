@@ -51,3 +51,17 @@ test('completeness grows with answers', () => {
   applyUpdate(u, { traitUpdates: [{ trait: 'social', value: 0.8, confidence: 0.5 }] });
   assert.ok(completeness(u) > before);
 });
+
+test('contact details never reach the shared profile', async () => {
+  const { hasContactInfo } = await import('../../src/profile.js');
+  for (const t of ['mail me at a@b.com', 'call 07700 900123', 'see www.me.com', 'my insta is @zia_j', 'add me on WhatsApp']) {
+    assert.ok(hasContactInfo(t), t);
+  }
+  for (const t of ['I ran 10 km in 2019', 'Coffee at 8, work by 9', 'Born in 1990, raised by the sea']) {
+    assert.ok(!hasContactInfo(t), t);
+  }
+  const u = user();
+  applyUpdate(u, { sharedSuggestions: [{ prompt: 'x', text: 'Find me on instagram @zia' }], bio: 'Text me on 07700 900123' });
+  assert.equal(u.shared.items.length, 0);
+  assert.equal(u.shared.bioDraft, '');
+});

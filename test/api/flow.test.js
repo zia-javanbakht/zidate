@@ -154,3 +154,12 @@ test('bad input is handled', async () => {
   const page = await fetch(`${srv.base}/../../etc/passwd`);
   assert.ok(!(await page.text()).includes('root:'));
 });
+
+test('people cannot put contact details on their profile by editing', async () => {
+  const c = client(srv.base);
+  await onboard(c);
+  const item = (await c.get('/api/profile')).data.shared.items[0];
+  const r = await c.patch(`/api/profile/items/${item.id}`, { text: 'Message me: me@example.com' });
+  assert.equal(r.status, 400);
+  assert.equal((await c.put('/api/profile/bio', { text: 'Snapchat: zzz' })).status, 400);
+});

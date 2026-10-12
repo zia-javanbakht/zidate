@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { hashPassword, verifyPassword, newToken, parseCookies } from './auth.js';
 import { emptyHidden } from './traits.js';
 import { respond, opening, newConversation, queueEvent, pickEngine } from './agent/index.js';
-import { completeness, isReady, describeHidden, publicProfile, cleanText, blendTrait } from './profile.js';
+import { completeness, isReady, describeHidden, publicProfile, cleanText, blendTrait, hasContactInfo } from './profile.js';
 import { weeklyPicks, matchId, compatibility } from './matching.js';
 import { weekKey, now } from './clock.js';
 import { TRAIT_KEYS } from './traits.js';
@@ -13,6 +13,7 @@ import { TRAIT_KEYS } from './traits.js';
 const PUBLIC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' };
 const SESSION_DAYS = 30;
+const NO_CONTACT = 'Keep contact details off your profile. You can share them once you match.';
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -207,6 +208,7 @@ export function createApp(store, { secureCookies = false } = {}) {
     if (typeof body.text === 'string') {
       const text = cleanText(body.text, 300);
       if (!text) throw new HttpError(400, 'It cannot be empty.');
+      if (hasContactInfo(text)) throw new HttpError(400, NO_CONTACT);
       item.text = text;
     }
     return { body: { item } };
@@ -218,7 +220,9 @@ export function createApp(store, { secureCookies = false } = {}) {
   });
 
   route('PUT', '/api/profile/bio', async ({ user, body }) => {
-    user.shared.bio = cleanText(body.useDraft ? user.shared.bioDraft : body.text, 400);
+    const bio = cleanText(body.useDraft ? user.shared.bioDraft : body.text, 400);
+    if (hasContactInfo(bio)) throw new HttpError(400, NO_CONTACT);
+    user.shared.bio = bio;
     if (body.useDraft) user.shared.bioDraft = '';
     return { body: { bio: user.shared.bio } };
   });

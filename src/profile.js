@@ -41,6 +41,19 @@ function removeConflicting(tags, added) {
   }
 }
 
+// Contact details do not belong on a public profile: they let people skip consent.
+const CONTACT = [
+  /[^\s@]+@[^\s@]+\.[a-z]{2,}/i, // email
+  /(\+?\d[\d\s().-]{7,}\d)/, // phone-ish
+  /\bhttps?:\/\/|\bwww\.|\b[a-z0-9-]+\.(com|net|org|io|me|co)\b/i, // links
+  /(^|\s)@[a-z0-9_.]{2,}/i, // social handles
+  /\b(insta(gram)?|snap(chat)?|whats ?app|telegram|tiktok|onlyfans)\b/i,
+];
+
+export function hasContactInfo(text) {
+  return CONTACT.some((re) => re.test(String(text)));
+}
+
 export function cleanText(text, max = 280) {
   return String(text || '').replace(/\s+/g, ' ').trim().slice(0, max);
 }
@@ -72,7 +85,7 @@ export function applyUpdate(user, update) {
   shared.interests = shared.interests.slice(0, 12);
   for (const s of update.sharedSuggestions || []) {
     const text = cleanText(s.text, 300);
-    if (!text) continue;
+    if (!text || hasContactInfo(text)) continue;
     const prompt = cleanText(s.prompt, 80) || null;
     const dupe = shared.items.find((i) => i.text.toLowerCase() === text.toLowerCase());
     if (dupe) continue;
@@ -89,7 +102,7 @@ export function applyUpdate(user, update) {
     shared.items = shared.items.filter((i) => !(i.status === 'suggested' && dropped++ < extra));
   }
   // The bio is also only a draft until the person accepts it.
-  if (update.bio) shared.bioDraft = cleanText(update.bio, 400);
+  if (update.bio && !hasContactInfo(update.bio)) shared.bioDraft = cleanText(update.bio, 400);
 }
 
 // How well we know the person, 0..1. Matching unlocks at READY.
