@@ -449,6 +449,7 @@ async function route() {
     if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   }
+  window.scrollTo(0, 0); // each screen starts at the top; Talk scrolls itself to the latest message
   try {
     if (name === 'match') await matchThread(decodeURIComponent(arg));
     else if (routes[name]) await routes[name]();

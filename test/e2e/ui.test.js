@@ -57,6 +57,10 @@ test('a new person signs up, talks, approves a line, and sees two people', { ski
         .filter((el) => !(el.getAttribute('aria-label') || el.textContent.trim() || (el.id && document.querySelector(`label[for="${el.id}"]`))))
         .map((el) => el.outerHTML.slice(0, 80)));
       assert.deepEqual(unnamed, [], hash);
+      await page.setViewportSize({ width: 320, height: 640 });
+      const overflow = await page.evaluate(() => document.querySelector('nav').getBoundingClientRect().right - window.innerWidth);
+      assert.ok(overflow <= 0, `${hash}: nav overflows by ${overflow}px at 320px`);
+      await page.setViewportSize({ width: 390, height: 844 });
     }
     assert.deepEqual(errors, []);
   } finally {
