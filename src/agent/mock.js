@@ -51,7 +51,8 @@ export const mockEngine = {
     const partner = pending?.mode === 'partner';
     if (!choiceApplied) {
       const traits = scoreTraits(answer);
-      if (partner) update.preferenceUpdates = traits;
+      // Saying what you want in someone else is direct evidence, so it counts more.
+      if (partner) update.preferenceUpdates = traits.map((t) => ({ ...t, confidence: Math.min(0.6, t.confidence * 1.4) }));
       else update.traitUpdates = traits;
       if (!partner) {
         update.interests = findInterests(answer);

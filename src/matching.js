@@ -58,9 +58,11 @@ export function fit(a, b) {
     const tb = b.hidden.traits[k];
     const pref = a.hidden.preference[k];
     // Target: similar to a, nudged toward what a has told us they like in others.
-    const pw = pref ? Math.min(0.7, pref.confidence) : 0;
+    // Stated preferences about partners count for more than our guess that like attracts like.
+    const pw = pref ? Math.min(0.85, pref.confidence * 2.2) : 0;
     const target = ta.value * (1 - pw) + (pref ? pref.value * pw : 0);
-    const w = (0.2 + ta.confidence) * (0.2 + tb.confidence);
+    // A trait they told us they care about in a partner also matters more overall.
+    const w = (0.2 + ta.confidence) * (0.2 + tb.confidence) * (1 + 4 * pw);
     num += w * (1 - Math.abs(target - tb.value));
     den += w;
   }
