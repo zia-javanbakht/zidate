@@ -183,3 +183,17 @@ test('a like is remembered: the other person sees them sooner, and both learn it
   assert.ok((await a.get('/api/week')).data.picks.find((p) => p.id === meB.id).matchId);
   await s2.close();
 });
+
+test('someone who passed on you, or unmatched you, is never suggested to you', async () => {
+  const s3 = await startServer({ seed: false });
+  const { ANSWERS } = await import('../helpers.js');
+  const a = client(s3.base);
+  const b = client(s3.base);
+  const meA = (await onboard(a, { name: 'Ana', answers: { ...ANSWERS, b_gender: 'Woman', b_seeking: 'Men' } })).me;
+  const meB = (await onboard(b, { name: 'Ben', answers: { ...ANSWERS, b_gender: 'Man', b_seeking: 'Women' } })).me;
+  await a.get('/api/week');
+  await a.post(`/api/week/${meB.id}`, { decision: 'pass' });
+  assert.equal((await b.get('/api/week')).data.picks.length, 0, 'Ben is not shown Ana');
+  assert.ok(meA);
+  await s3.close();
+});

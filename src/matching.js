@@ -102,6 +102,12 @@ function everSuggested(store, userId) {
   return seen;
 }
 
+// Someone who already said no, or an unmatched/reported pair, is never suggested.
+function closed(store, a, b) {
+  const d = store.data;
+  return Boolean(d.passes[`${b.id}>${a.id}`] || d.blocks[`${a.id}>${b.id}`] || d.blocks[`${b.id}>${a.id}`]);
+}
+
 // Get (or create, once per week) this person's suggestions.
 export function weeklyPicks(store, user) {
   const wk = weekKey();
@@ -111,7 +117,7 @@ export function weeklyPicks(store, user) {
     if (!isReady(user)) return { week: wk, ready: false, picks: [], next: nextWeekStart().toISOString() };
     const seen = everSuggested(store, user.id);
     const ranked = Object.values(store.data.users)
-      .filter((o) => !seen.has(o.id) && isReady(o) && eligible(user, o))
+      .filter((o) => !seen.has(o.id) && isReady(o) && eligible(user, o) && !closed(store, user, o))
       // Someone who already liked this person is a likely mutual match: give them a lift.
       .map((o) => ({ o, s: compatibility(user, o) + (store.data.likes[`${o.id}>${user.id}`] ? 0.15 : 0), local: sameCity(user, o) }))
       // People nearby come first; only widen the search when the city runs out.

@@ -184,7 +184,9 @@ export function createApp(store, { secureCookies = false, limits = LIMITS } = {}
     delete store.data.conversations[id];
     for (const [t, s] of Object.entries(store.data.sessions)) if (s.userId === id) delete store.data.sessions[t];
     for (const k of Object.keys(store.data.weeks)) if (k.startsWith(`${id}:`)) delete store.data.weeks[k];
-    for (const k of Object.keys(store.data.likes)) if (k.includes(id)) delete store.data.likes[k];
+    for (const table of [store.data.likes, store.data.passes, store.data.blocks]) {
+      for (const k of Object.keys(table)) if (k.split('>').includes(id)) delete table[k];
+    }
     for (const [mid, m] of Object.entries(store.data.matches)) {
       if (m.users.includes(id)) {
         delete store.data.matches[mid];
@@ -269,6 +271,7 @@ export function createApp(store, { secureCookies = false, limits = LIMITS } = {}
     pick.decision = decision;
     const convo = store.data.conversations[user.id];
     let match = null;
+    if (decision === 'pass') store.data.passes[`${user.id}>${other.id}`] = now().toISOString();
     if (decision === 'like') {
       store.data.likes[`${user.id}>${other.id}`] = now().toISOString();
       learnFromLike(user, other);
@@ -335,6 +338,7 @@ export function createApp(store, { secureCookies = false, limits = LIMITS } = {}
   route('POST', '/api/matches/:id/unmatch', async ({ user, params, body }) => {
     const m = getMatch(user, params.id);
     if (body.report) store.data.reports.push({ by: user.id, about: m.users.find((u) => u !== user.id), reason: cleanText(body.reason, 500), at: now().toISOString() });
+    store.data.blocks[`${user.id}>${m.users.find((u) => u !== user.id)}`] = now().toISOString();
     delete store.data.matches[m.id];
     delete store.data.messages[m.id];
     return { body: { ok: true } };
