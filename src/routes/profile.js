@@ -43,7 +43,7 @@ export default function profile({ store, route, HttpError, meView, photos }) {
     if (!text) throw new HttpError(400, 'Write something first.');
     if (hasContactInfo(text)) throw new HttpError(400, NO_CONTACT);
     if (user.shared.items.length >= 30) throw new HttpError(400, 'That is plenty. Remove one first.');
-    const item = { id: `it_${Math.random().toString(36).slice(2, 10)}`, prompt, text, status: 'approved' };
+    const item = { id: `it_${Math.random().toString(36).slice(2, 10)}`, prompt, text, status: 'approved', own: true };
     user.shared.items.push(item);
     return { status: 201, body: { item } };
   });

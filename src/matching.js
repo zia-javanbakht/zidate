@@ -121,9 +121,10 @@ function closed(store, a, b) {
 export function weeklyPicks(store, user) {
   const wk = weekKey();
   const key = `${user.id}:${wk}`;
+  // Paused people see that state instead of suggestions; anything already decided this week is kept.
+  if (settingsOf(user).paused) return { week: wk, ready: isReady(user), paused: true, picks: [], next: nextWeekStart().toISOString() };
   let week = store.data.weeks[key];
   if (!week) {
-    if (settingsOf(user).paused) return { week: wk, ready: isReady(user), paused: true, picks: [], next: nextWeekStart().toISOString() };
     if (!isReady(user)) {
       // Tell the person what is still missing, in plain words.
       const missing = basicsDone(user)

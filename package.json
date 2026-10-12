@@ -1,6 +1,6 @@
 {
   "name": "zidate",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Conversation-based dating: an AI interviewer builds a hidden and a shared profile, and you get two suggestions a week.",
   "type": "module",
   "main": "src/server.js",

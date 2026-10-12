@@ -7,9 +7,11 @@ A dating app with no swiping. You talk with an AI matchmaker, it builds two prof
 - **Two a week**: suggestions come from your city first, respect both people's age ranges, who each wants to meet and dealbreakers, and are ranked by mutual fit. You never see the same person twice, or anyone who already passed on you.
 - **It keeps learning**: when you like or pass, the matchmaker asks why, and your answer updates the hidden profile's partner preferences, which changes who you meet next week. Liking someone also nudges preferences toward them.
 
+Also: photos (private until a match by default), live messaging with read receipts and icebreakers, in-app and email notifications, email confirmation and password reset, pause, data export, abuse filtering, reporting and a moderator page. See IMPROVEMENTS.md for the full list.
+
 ## Run it
 
-Needs Node 20 or newer.
+Needs Node 20 or newer. Or with Docker: `docker build -t zidate . && docker run -p 3000:3000 -v zidate:/data zidate`.
 
 ```sh
 npm install
@@ -30,13 +32,22 @@ On first start it creates 64 demo people (London, Berlin, New York and Toronto),
 |---|---|---|
 | `PORT` | `3000` | HTTP port |
 | `ZIDATE_DB` | `data/db.json` | Where data is stored (a single JSON file, written atomically) |
+| `ZIDATE_PHOTOS` | `data/photos` | Where uploaded photos are kept |
+| `ZIDATE_OUTBOX` | `data/outbox` | Every outgoing email is also saved here as JSON |
+| `ZIDATE_MAIL_WEBHOOK` | | URL that receives each email as a JSON POST (`from`, `to`, `subject`, `text`), to connect any email service |
+| `ZIDATE_BASE_URL` | `http://localhost:PORT` | Used for links in emails |
+| `ADMIN_EMAILS` | | Comma-separated emails that can open the moderator page (You > Settings > Moderation) |
+| `ZIDATE_SEED` | `1` | `0` skips the demo people |
+| `ZIDATE_LOG` | | `1` logs each request (ids masked) |
 | `NODE_ENV=production` | | Marks the session cookie `Secure` (use behind HTTPS) |
+
+Backups of the data file are written daily next to it (last 7 kept).
 
 ## Tests
 
 ```sh
-npm test             # 57 unit and API tests
-npm run test:e2e     # browser test (needs Playwright with Chromium installed)
+npm test             # 83 unit and API tests
+npm run test:e2e     # 2 browser tests (need Playwright with Chromium installed)
 node scripts/screenshots.mjs out/   # screenshots of every screen, light and dark
 node scripts/turns-to-ready.mjs -v  # how many answers until matching unlocks
 ```
@@ -46,7 +57,16 @@ node scripts/turns-to-ready.mjs -v  # how many answers until matching unlocks
 ```
 src/
   server.js        starts the HTTP server
-  app.js           API routes and static files (no framework)
+  app.js           wires services together, serves the API and static files (no framework)
+  http.js          tiny router, body parsing, rate limits
+  routes/          one file per area: account, chat, profile, week, matches, notifications, admin
+  events.js        live updates (server-sent events)
+  mailer.js        outgoing email (outbox folder and/or webhook)
+  photos.js        photo checks and storage
+  moderation.js    abuse filter
+  social.js        matches, check-ins, icebreakers, demo replies
+  scheduler.js     weekly picks, check-ins, backups
+  config.js        settings from the environment
   agent/
     index.js       the conversation loop: what to ask next, applying answers
     questions.js   the question bank (open questions and quick replies)
@@ -56,9 +76,9 @@ src/
   profile.js       hidden/shared profile rules, what is public
   matching.js      eligibility, fit, weekly picks
   traits.js, clock.js, db.js, auth.js, seed.js
-public/            the web app (plain JS, no build step)
+public/            the web app (plain JS modules in public/js, no build step; installable)
 test/              unit, API and browser tests
-IMPROVEMENTS.md    the 20 improvement cycles and what each fixed
+IMPROVEMENTS.md    the 70 improvements and how each was checked
 ```
 
 ## Privacy and safety
@@ -72,4 +92,4 @@ IMPROVEMENTS.md    the 20 improvement cycles and what each fixed
 
 ## Not built yet
 
-Photos, push or email notifications, real-time chat, and moderation tooling for reports.
+Phone push notifications, photo moderation, and a real database for more than a few thousand people. The Claude matchmaker has not been run against the live API in development (no key was available); the offline matchmaker is fully tested.

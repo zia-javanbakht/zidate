@@ -8,6 +8,8 @@
   <meta name="theme-color" content="#151413" media="(prefers-color-scheme: dark)">
   <title>ziDate</title>
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icon.svg">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -20,9 +22,10 @@
       <a href="#/matches" data-tab="matches">Matches<span class="dot" hidden></span></a>
       <a href="#/profile" data-tab="profile">You</a>
     </nav>
+    <a class="bell" href="#/notifications" data-tab="notifications" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg><span class="dot" hidden></span></a>
   </header>
   <main id="main" tabindex="-1"></main>
   <div class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="/app.js"></script>
+  <script type="module" src="/js/main.js"></script>
 </body>
 </html>

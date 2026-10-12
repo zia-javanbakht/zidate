@@ -169,8 +169,6 @@ test('live messages, notifications, read receipts and icebreakers', async () => 
   const notes = (await a.get('/api/notifications')).data.notifications;
   assert.ok(notes.some((n) => n.type === 'match'));
   // Ana has the app open: she gets Ben's message live.
-  const cookie = (await fetch(`${s.base}/api/me`)).headers; // no-op, keeps shape
-  assert.ok(cookie);
   const anaStream = await openStream(s, a);
   await b.post(`/api/matches/${mid}`, { text: 'Hi Ana!' });
   const ev = await anaStream.next('message');

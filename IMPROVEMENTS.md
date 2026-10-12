@@ -24,3 +24,60 @@ Each cycle: find a problem (from tests, screenshots, or a read-through), fix it,
 | 18 | The core promise ("tell me why you passed and I'll update your hidden profile") was not measurable, and a simulation showed it did nothing: after "too quiet, I want someone outgoing", the next two weeks brought exactly the same four people. The preference was recorded but weighted too weakly to change a ranking. | Stated partner preferences count more than inferred ones (higher confidence, stronger pull on the target, and that trait weighs more in the score). One comment shifts the picks without overriding everything else. | New simulation test over 200 demo people: average sociability of the next 4 suggestions rises from 0.52 to 0.63, and one new, more outgoing person appears. |
 | 19 | Before matching unlocked, "This week" just said "Not yet", with no idea how far off it was; after deciding on both people, the page still read as if there was something to do. | The page lists what is still to talk about in plain words ("faith and spirituality; how active you are…"), and once both decisions are made it says the week is done and when the next two arrive. | New API test for the missing-topics list. |
 | 20 | On a 320px phone the nav ran 15px off-screen ("You" was cut off), and switching tabs kept the chat's scroll position, so "This week" opened halfway down a card. | Tighter nav below 360px; each screen opens at the top (Talk still jumps to the latest message). | Browser test now fails if the nav overflows at 320px; screenshots re-checked. |
+
+## Round 2: missing features (21–70)
+
+Asked for: complete the missing components and features, with up to 50 suggestions pre-approved. Each item has a test, or was checked in screenshots where noted. Totals: 83 unit and API tests, 2 browser tests.
+
+| # | Area | What changed | Verified by |
+|---|---|---|---|
+| 21 | Accounts | Email confirmation by link, with a reminder and resend in Settings. | API test (verify, bad token, resend) |
+| 22 | Accounts | Forgot password: emailed one-hour link, same reply whether or not the account exists. Resetting signs you in and signs out other devices. | API test; browser test does the whole flow |
+| 23 | Accounts | Change password (other devices signed out) and "Sign out other devices". | API test |
+| 24 | Security | Per-account lockout after 8 wrong passwords in 15 minutes, on top of the per-address limit. | API test |
+| 25 | Settings | Name, age, gender, who you want to meet, age range and city can be changed after onboarding. | API test; browser test saves "nyc" and gets "New York" |
+| 26 | Settings | Pause: you stop getting suggestions and are hidden from others; matches stay. "This week" says you are paused, with Resume. | API test; browser test |
+| 27 | Photos | Up to 4 photos, resized in the browser, checked by file signature (JPEG/PNG/WebP), 3 MB cap. | API test; browser upload test |
+| 28 | Photos | Photos only after a match by default (a setting). Photo URLs are permission-checked: owner, matches, or this week's suggestions when allowed. | API test for each viewer |
+| 29 | Photos | Choose the main photo, remove photos; cards show a swipeable gallery; match list shows avatars. | Screenshots |
+| 30 | Profile | Write your own lines from 14 prompts (contact details still blocked). | API test; browser test |
+| 31 | Profile | Add or remove interests from a list. | API test; browser test |
+| 32 | Profile | Dealbreakers can be added and removed by hand. | API test |
+| 33 | Profile | The hidden profile opens with a plain-words summary ("So far you come across as…"). | Unit test |
+| 34 | Notifications | In-app notifications with a bell and unread dot: new match, new message, weekly picks, check-ins. | API test; browser test opens a match from the bell |
+| 35 | Notifications | Emails for picks, matches and messages, each switchable, only sent when you do not have the app open, and one per unread conversation. | API test |
+| 36 | Messaging | Messages arrive live (server-sent events), no refresh needed. | API stream test; browser test |
+| 37 | Messaging | "Seen" read receipts. | API test; browser test |
+| 38 | Messaging | Icebreaker suggestions built from shared interests and profile lines. | API test; browser test |
+| 39 | Messaging | Message times; match list shows when the last message was. | Screenshots |
+| 40 | Safety | Hurtful messages are blocked with a clear reason; three blocks create an automatic report. | Unit and API tests; browser test |
+| 41 | Safety | Report someone straight from a weekly suggestion; they never come back. | API test |
+| 42 | Safety | Unmatch and report in an in-page dialog; reports carry the last 10 messages for the moderator. | Browser test |
+| 43 | Moderation | Moderator page (ADMIN_EMAILS): dismiss, suspend (signed out everywhere, emailed), restore. Suspended accounts cannot sign in. | API test; browser test dismisses a report |
+| 44 | Moderation | Stats: people, ready, paused, suspended, matches, messages this week, open reports. | API test |
+| 45 | Matching | When a week comes up short, "Widen my age range" refills it. | API test |
+| 46 | Matching | An hourly job prepares Monday's picks and sends one "your two people are here" notification. | API test |
+| 47 | Matchmaker | A week after a match, the matchmaker asks how it went and learns from the answer. | API test |
+| 48 | Matchmaker | 16 deeper follow-up questions after the core interview, two per trait. | Unit test |
+| 49 | Matchmaker | Spots contradictions (for example "homebody" after "life of the party") and asks once to clarify. | Unit test |
+| 50 | Matchmaker | "Welcome back" with the open question after a day away. | Unit test |
+| 51 | Matching | City names are cleaned up ("nyc", "München", "london, uk"), so same-city matching works. | Unit test |
+| 52 | Privacy | Download all your data as JSON. | API test |
+| 53 | Privacy | Deleting your account also removes photos, links and notifications. | API test |
+| 54 | Ops | Daily backups of the data file, last 7 kept. | Unit test |
+| 55 | Ops | All settings from environment variables, with warnings at start for risky gaps. | Unit test |
+| 56 | Ops | /api/health and optional request logging with ids masked. | API test |
+| 57 | Ops | Graceful shutdown saves data and closes live connections. | Manual start/stop |
+| 58 | Code | Server split into one file per area with a small router; same behaviour (all 57 earlier tests still pass). | Full suite |
+| 59 | Client | In-page dialogs replace browser prompt() and confirm() everywhere. | Browser test |
+| 60 | Client | Light, dark or automatic theme. | Browser test; screenshots |
+| 61 | Client | Talk keeps a half-written answer across reloads; character counter near the limit; a failed send puts the answer back. | Manual check |
+| 62 | Client | Offline banner, and friendly errors with "Try again". | Manual check |
+| 63 | Client | Loading placeholder, shown only when a screen is slow. | Manual check |
+| 64 | Client | Real "Nothing here" page for unknown links. | Browser test |
+| 65 | Client | "How ziDate works" page covering the two profiles, privacy and safety. | Screenshots |
+| 66 | Client | Installable app (manifest) with offline shell caching; the API is never cached. | Manual check |
+| 67 | Ops | Dockerfile with a /data volume and health check. | Not built here (no Docker daemon); runs the same command as `npm start` |
+| 68 | Ops | GitHub Actions workflow: unit, API and browser tests, plus a Docker build. | Not run (no repository yet) |
+| 69 | Bug | Pausing mid-week still showed the week's picks. Paused now always wins. | Found by the new browser test |
+| 70 | Bug | Dialog dropdowns started empty, so "Add a line" always failed. Also: match messages now have their own bubble, and the forgot-password page keeps the email you typed. | Found by the new browser test; screenshots |
