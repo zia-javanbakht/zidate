@@ -85,6 +85,8 @@ function unreadCount(store, uid) {
   for (const m of Object.values(store.data.matches)) {
     if (!m.users.includes(uid)) continue;
     const seen = m.seen?.[uid] || '';
+    // A brand-new match counts as something to look at.
+    if (!seen) n += 1;
     n += (store.data.messages[m.id] || []).filter((msg) => msg.from !== uid && msg.at > seen).length;
   }
   return n;
@@ -102,7 +104,8 @@ function learnFromLike(user, other) {
 function createMatch(store, a, b) {
   const id = matchId(a.id, b.id);
   if (store.data.matches[id]) return store.data.matches[id];
-  const m = { id, users: [a.id, b.id], createdAt: now().toISOString(), seen: {} };
+  // The person who completed the match sees it straight away, so it is not "new" for them.
+  const m = { id, users: [a.id, b.id], createdAt: now().toISOString(), seen: { [a.id]: now().toISOString() } };
   store.data.matches[id] = m;
   store.data.messages[id] = [];
   for (const [x, y] of [[a, b], [b, a]]) {
@@ -298,6 +301,7 @@ export function createApp(store, { secureCookies = false, limits = LIMITS } = {}
           person: other ? publicProfile(other) : null,
           last: last ? { text: last.text, mine: last.from === user.id, at: last.at } : null,
           unread: msgs.filter((x) => x.from !== user.id && x.at > seen).length,
+          isNew: !seen,
         };
       })
       .filter((m) => m.person)

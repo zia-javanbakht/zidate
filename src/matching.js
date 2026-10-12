@@ -112,7 +112,8 @@ export function weeklyPicks(store, user) {
     const seen = everSuggested(store, user.id);
     const ranked = Object.values(store.data.users)
       .filter((o) => !seen.has(o.id) && isReady(o) && eligible(user, o))
-      .map((o) => ({ o, s: compatibility(user, o), local: sameCity(user, o) }))
+      // Someone who already liked this person is a likely mutual match: give them a lift.
+      .map((o) => ({ o, s: compatibility(user, o) + (store.data.likes[`${o.id}>${user.id}`] ? 0.15 : 0), local: sameCity(user, o) }))
       // People nearby come first; only widen the search when the city runs out.
       .sort((p, q) => q.local - p.local || q.s - p.s || p.o.id.localeCompare(q.o.id));
     week = { createdAt: now().toISOString(), picks: ranked.slice(0, PER_WEEK).map(({ o, s }) => ({ id: o.id, score: Math.round(s * 100) / 100, decision: null })) };
@@ -127,7 +128,8 @@ export function weeklyPicks(store, user) {
       .filter((p) => store.data.users[p.id])
       .map((p) => {
         const other = store.data.users[p.id];
-        return { ...publicProfile(other), reason: reason(user, other), decision: p.decision };
+        const matched = Boolean(store.data.matches[matchId(user.id, other.id)]);
+        return { ...publicProfile(other), reason: reason(user, other), decision: p.decision, matchId: matched ? matchId(user.id, other.id) : null };
       }),
   };
 }

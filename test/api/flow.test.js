@@ -163,3 +163,23 @@ test('people cannot put contact details on their profile by editing', async () =
   assert.equal(r.status, 400);
   assert.equal((await c.put('/api/profile/bio', { text: 'Snapchat: zzz' })).status, 400);
 });
+
+test('a like is remembered: the other person sees them sooner, and both learn it is mutual', async () => {
+  const s2 = await startServer({ seed: false });
+  const a = client(s2.base);
+  const b = client(s2.base);
+  const answersA = (await import('../helpers.js')).ANSWERS;
+  const meA = (await onboard(a, { name: 'Ana', answers: { ...answersA, b_gender: 'Woman', b_seeking: 'Men' } })).me;
+  const meB = (await onboard(b, { name: 'Ben', answers: { ...answersA, b_gender: 'Man', b_seeking: 'Women', b_age: '32' } })).me;
+  const weekA = (await a.get('/api/week')).data;
+  assert.ok(weekA.picks.some((p) => p.id === meB.id));
+  await a.post(`/api/week/${meB.id}`, { decision: 'like' });
+  const weekB = (await b.get('/api/week')).data;
+  assert.ok(weekB.picks.some((p) => p.id === meA.id));
+  const res = await b.post(`/api/week/${meA.id}`, { decision: 'like' });
+  assert.ok(res.data.match);
+  assert.equal((await a.get('/api/me')).data.user.unread, 1, 'Ana is told about the new match');
+  assert.equal((await b.get('/api/me')).data.user.unread, 0, 'Ben just made it, nothing new for him');
+  assert.ok((await a.get('/api/week')).data.picks.find((p) => p.id === meB.id).matchId);
+  await s2.close();
+});

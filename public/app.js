@@ -209,8 +209,10 @@ function personCard(p, { onDecide } = {}) {
     p.interests?.length ? h('ul', { class: 'tags', 'aria-label': 'Interests' }, p.interests.map((i) => h('li', {}, i))) : null,
     p.items?.length ? h('dl', { class: 'qa' }, p.items.flatMap((i) => [h('dt', {}, i.prompt || 'About me'), h('dd', {}, i.text)])) : null);
   if (onDecide) {
-    if (p.decision) {
-      card.append(h('p', { class: 'decided' }, p.decision === 'like' ? 'You liked them.' : 'You passed.'));
+    if (p.matchId) {
+      card.append(h('p', { class: 'decided' }, 'It is mutual. ', h('a', { href: `#/match/${encodeURIComponent(p.matchId)}` }, `Say hello to ${p.name}`)));
+    } else if (p.decision) {
+      card.append(h('p', { class: 'decided' }, p.decision === 'like' ? 'You liked them. I will tell you if it is mutual.' : 'You passed.'));
     } else {
       const like = h('button', { class: 'btn accent' }, 'Like');
       const pass = h('button', { class: 'btn ghost' }, 'Pass');
@@ -277,7 +279,7 @@ async function matches() {
         h('div', {},
           h('div', { class: 'name' }, m.person.name),
           h('div', { class: 'preview' }, m.last ? `${m.last.mine ? 'You: ' : ''}${m.last.text}` : 'Say hello')),
-        m.unread ? h('span', { class: 'badge' }, String(m.unread)) : null))))));
+        m.unread ? h('span', { class: 'badge' }, String(m.unread)) : m.isNew ? h('span', { class: 'badge' }, 'New') : null))))));
 }
 
 async function matchThread(id) {
@@ -406,12 +408,11 @@ const routes = { talk, week, matches, profile };
 
 async function route() {
   const [, name = '', arg] = location.hash.match(/^#\/([^/]*)\/?(.*)$/) || [];
-  if (!me) {
-    try {
-      setMe((await api('GET', '/api/me')).user);
-    } catch {
-      me = null;
-    }
+  // Refresh on every navigation so the Matches dot stays current.
+  try {
+    setMe((await api('GET', '/api/me')).user);
+  } catch {
+    me = null;
   }
   if (!me) return welcome();
   if (name === 'welcome' || !name) {
