@@ -57,6 +57,7 @@ export const ANSWERS = {
   q_values: 'Honesty and kindness, and making time for family.',
   q_proud: 'Designing a small library in my home town that people actually use.',
   q_partner_day: 'Out on a hike or at a market, curious about everything, chatting to strangers.',
+  q_age_range: 'Around my age',
   q_dealbreakers: 'Smoking is a hard no.',
   q_partner_trait: 'Kindness and being able to laugh at themselves.',
 };

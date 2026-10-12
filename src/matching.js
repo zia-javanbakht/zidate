@@ -14,13 +14,15 @@ function wants(seeker, other) {
   return false;
 }
 
+export const DEFAULT_AGE_RANGE = 8;
+
 function ageOk(a, b) {
-  // Classic "half your age plus seven", both ways, plus a hard cap of 15 years.
+  // Each person's own range must hold, plus "half your age plus seven" as a floor.
   const [x, y] = [a.basics.age, b.basics.age];
   if (!x || !y) return false;
-  const lo = Math.min(x, y);
-  const hi = Math.max(x, y);
-  return lo >= hi / 2 + 7 && hi - lo <= 15;
+  const gap = Math.abs(x - y);
+  if (gap > (a.basics.ageRange ?? DEFAULT_AGE_RANGE) || gap > (b.basics.ageRange ?? DEFAULT_AGE_RANGE)) return false;
+  return Math.min(x, y) >= Math.max(x, y) / 2 + 7;
 }
 
 function sameCity(a, b) {
@@ -80,10 +82,14 @@ export function compatibility(a, b) {
 
 // A reason shown to the person. Built only from shared information, never hidden traits.
 export function reason(a, b) {
+  const away = sameCity(a, b) ? '' : ` A little further away, in ${b.basics.city}.`;
+  return sharedReason(a, b) + away;
+}
+
+function sharedReason(a, b) {
   const common = a.shared.interests.filter((i) => b.shared.interests.includes(i));
   if (common.length >= 2) return `You both like ${common[0]} and ${common[1]}.`;
   if (common.length === 1) return `You both like ${common[0]}.`;
-  if (sameCity(a, b)) return `Also in ${b.basics.city}, and our conversations suggest you would get on.`;
   return 'Our conversations suggest you would get on.';
 }
 
@@ -106,8 +112,9 @@ export function weeklyPicks(store, user) {
     const seen = everSuggested(store, user.id);
     const ranked = Object.values(store.data.users)
       .filter((o) => !seen.has(o.id) && isReady(o) && eligible(user, o))
-      .map((o) => ({ o, s: compatibility(user, o) }))
-      .sort((p, q) => q.s - p.s || p.o.id.localeCompare(q.o.id));
+      .map((o) => ({ o, s: compatibility(user, o), local: sameCity(user, o) }))
+      // People nearby come first; only widen the search when the city runs out.
+      .sort((p, q) => q.local - p.local || q.s - p.s || p.o.id.localeCompare(q.o.id));
     week = { createdAt: now().toISOString(), picks: ranked.slice(0, PER_WEEK).map(({ o, s }) => ({ id: o.id, score: Math.round(s * 100) / 100, decision: null })) };
     store.data.weeks[key] = week;
     store.save();

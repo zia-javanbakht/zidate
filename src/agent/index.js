@@ -137,6 +137,7 @@ export async function respond(user, convo, rawText, engine = pickEngine()) {
       traitUpdates: Object.entries(choice.set).map(([trait, value]) => ({ trait, value, confidence: 0.55 })),
       tags: choice.tags || [],
     });
+    Object.assign(user.basics, choice.basics || {});
     choiceApplied = true;
   }
 

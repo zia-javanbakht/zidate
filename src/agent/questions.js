@@ -97,6 +97,16 @@ export const QUESTIONS = [
     traits: ['social', 'activity', 'adventure'],
   },
   {
+    id: 'q_age_range', mode: 'partner',
+    text: 'How close in age would you like them to be?',
+    traits: [],
+    choices: [
+      { label: 'Around my age', ack: 'Around your age, then.', set: {}, basics: { ageRange: 5 } },
+      { label: 'Up to 10 years either way', ack: 'Got it.', set: {}, basics: { ageRange: 10 } },
+      { label: 'Age is just a number', ack: 'Wide open. Within reason.', set: {}, basics: { ageRange: 15 } },
+    ],
+  },
+  {
     id: 'q_dealbreakers', mode: 'partner',
     text: 'Is there anything that would be a dealbreaker for you?',
     traits: [],

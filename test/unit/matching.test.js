@@ -28,6 +28,11 @@ test('age gaps and dealbreakers exclude', () => {
   const a = person(s, { gender: 'woman', seeking: 'men', age: 25, city: 'London' });
   const old = person(s, { gender: 'man', seeking: 'women', age: 45, city: 'London' });
   assert.equal(eligible(a, old), false);
+  const tight = person(s, { gender: 'man', seeking: 'women', age: 27, city: 'London', ageRange: 3 });
+  assert.equal(eligible(a, tight), true);
+  a.basics.ageRange = 3;
+  const four = person(s, { gender: 'man', seeking: 'women', age: 29, city: 'London' });
+  assert.equal(eligible(a, four), false, 'outside her chosen range');
   const b = person(s, { gender: 'man', seeking: 'women', age: 27, city: 'London' });
   b.hidden.tags.push('smoker');
   a.hidden.dealbreakers.push('smoker');
@@ -72,4 +77,17 @@ test('not ready means no picks', () => {
   seedDemo(s);
   const a = newUser(s, { name: 'New', email: 'n@x.com', password: null });
   assert.equal(weeklyPicks(s, a).ready, false);
+});
+
+test('people in the same city come first; others are labelled as further away', () => {
+  clock.reset();
+  const s = new Store(null);
+  seedDemo(s);
+  const a = person(s, { gender: 'woman', seeking: 'men', age: 30, city: 'Berlin' }, 0.6);
+  const w = weeklyPicks(s, a);
+  assert.ok(w.picks.every((p) => p.city === 'Berlin'), JSON.stringify(w.picks.map((p) => p.city)));
+  const far = person(s, { gender: 'woman', seeking: 'men', age: 30, city: 'Lisbon' }, 0.6);
+  const w2 = weeklyPicks(s, far);
+  assert.equal(w2.picks.length, 2);
+  assert.ok(w2.picks.every((p) => p.reason.includes('further away')));
 });
