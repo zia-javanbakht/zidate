@@ -48,6 +48,16 @@ test('a new person signs up, talks, approves a line, and sees two people', { ski
 
     await page.getByRole('link', { name: 'Talk' }).click();
     await page.waitForSelector('.msg.agent');
+
+    // Basic accessibility: every control has a name, every field a label.
+    for (const hash of ['#/talk', '#/week', '#/profile']) {
+      await page.goto(srv.base + '/' + hash);
+      await page.waitForTimeout(300);
+      const unnamed = await page.evaluate(() => [...document.querySelectorAll('button, a, input, textarea')]
+        .filter((el) => !(el.getAttribute('aria-label') || el.textContent.trim() || (el.id && document.querySelector(`label[for="${el.id}"]`))))
+        .map((el) => el.outerHTML.slice(0, 80)));
+      assert.deepEqual(unnamed, [], hash);
+    }
     assert.deepEqual(errors, []);
   } finally {
     await browser.close();

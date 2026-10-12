@@ -4,7 +4,9 @@
   --text: #1c1b19;
   --muted: #6e6a63;
   --line: #e4e0d8;
-  --accent: #b5603f;
+  --accent: #a5533a;
+  --danger: #b3261e;
+  --ok: #2e7d4f;
   --accent-ink: #ffffff;
   --mine: #1c1b19;
   --mine-ink: #f7f5f1;
@@ -17,11 +19,13 @@
   :root {
     --bg: #151413;
     --surface: #1e1d1b;
-    --text: #ecE8e1;
+    --text: #ece8e1;
     --muted: #9c978e;
     --line: #2f2d2a;
     --accent: #d98463;
     --accent-ink: #151413;
+    --danger: #f2867e;
+    --ok: #6fc28f;
     --mine: #ece8e1;
     --mine-ink: #151413;
     color-scheme: dark;
@@ -86,7 +90,7 @@ main { max-width: 680px; margin: 0 auto; padding: 28px 16px 40px; outline: none;
 .btn.accent { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .btn.small { min-height: 34px; padding: 5px 14px; font-size: .875rem; }
 .link { background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline; cursor: pointer; }
-.link.danger { color: #b3261e; }
+.link.danger { color: var(--danger); }
 
 input[type=text], input[type=email], input[type=password], textarea {
   width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px;
@@ -94,7 +98,7 @@ input[type=text], input[type=email], input[type=password], textarea {
 }
 textarea { resize: none; }
 label { display: block; font-size: .875rem; color: var(--muted); margin-bottom: 6px; }
-.error { color: #b3261e; font-size: .9rem; min-height: 1.4em; }
+.error { color: var(--danger); font-size: .9rem; min-height: 1.4em; }
 
 /* Welcome */
 .welcome { min-height: 80dvh; display: flex; flex-direction: column; justify-content: center; gap: 28px; }
@@ -161,7 +165,7 @@ label { display: block; font-size: .875rem; color: var(--muted); margin-bottom: 
 .item .text { margin: 4px 0 10px; }
 .item .row { display: flex; gap: 8px; flex-wrap: wrap; }
 .state { font-size: .8rem; color: var(--muted); }
-.state.approved { color: #2e7d4f; }
+.state.approved { color: var(--ok); }
 .trait { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 10px 0; border-top: 1px solid var(--line); }
 .trait .label { display: flex; justify-content: space-between; font-size: .9rem; }
 .bar { position: relative; height: 4px; background: var(--line); border-radius: 4px; }
