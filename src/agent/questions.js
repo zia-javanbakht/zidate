@@ -25,9 +25,9 @@ export const QUESTIONS = [
     text: 'After a long week, what sounds best?',
     traits: ['social'],
     choices: [
-      { label: 'A big night out', set: { social: 0.9, activity: 0.6 } },
-      { label: 'Dinner with one or two friends', set: { social: 0.55 } },
-      { label: 'A quiet night in', set: { social: 0.15, activity: 0.3 } },
+      { label: 'A big night out', ack: 'A night out it is.', set: { social: 0.9, activity: 0.6 } },
+      { label: 'Dinner with one or two friends', ack: 'Small and good. Same.', set: { social: 0.55 } },
+      { label: 'A quiet night in', ack: 'A quiet night in is underrated.', set: { social: 0.15, activity: 0.3 } },
     ],
   },
   {
@@ -40,9 +40,9 @@ export const QUESTIONS = [
     text: 'Friends invite you away for the weekend, leaving in two hours. You…',
     traits: ['planning', 'adventure'],
     choices: [
-      { label: 'Pack and go', set: { planning: 0.1, adventure: 0.9 } },
-      { label: 'Go, after a few calls', set: { planning: 0.5, adventure: 0.6 } },
-      { label: 'Pass, my weekend is planned', set: { planning: 0.9, adventure: 0.25 } },
+      { label: 'Pack and go', ack: 'Bold. I like it.', set: { planning: 0.1, adventure: 0.9 } },
+      { label: 'Go, after a few calls', ack: 'Up for it, with a plan B. Noted.', set: { planning: 0.5, adventure: 0.6 } },
+      { label: 'Pass, my weekend is planned', ack: 'A person with plans. Noted.', set: { planning: 0.9, adventure: 0.25 } },
     ],
   },
   {
@@ -55,10 +55,10 @@ export const QUESTIONS = [
     text: 'Where do kids and family fit in your future?',
     traits: ['family'],
     choices: [
-      { label: 'I want kids', set: { family: 0.9 }, tags: ['wants-kids'] },
-      { label: 'Open to it', set: { family: 0.6 } },
-      { label: "I don't want kids", set: { family: 0.2 }, tags: ['no-kids'] },
-      { label: 'I already have kids', set: { family: 0.85 }, tags: ['has-kids'] },
+      { label: 'I want kids', ack: 'Thank you, that matters a lot for matching.', set: { family: 0.9 }, tags: ['wants-kids'] },
+      { label: 'Open to it', ack: 'Open is good. Noted.', set: { family: 0.6 } },
+      { label: "I don't want kids", ack: 'Thank you, that matters a lot for matching.', set: { family: 0.2 }, tags: ['no-kids'] },
+      { label: 'I already have kids', ack: 'Thank you for telling me.', set: { family: 0.85 }, tags: ['has-kids'] },
     ],
   },
   {
@@ -71,9 +71,9 @@ export const QUESTIONS = [
     text: 'How do you like to move?',
     traits: ['activity'],
     choices: [
-      { label: 'Training most days', set: { activity: 0.95 } },
-      { label: 'Walks, the odd class', set: { activity: 0.55 } },
-      { label: 'The sofa is underrated', set: { activity: 0.15 } },
+      { label: 'Training most days', ack: 'Impressive.', set: { activity: 0.95 } },
+      { label: 'Walks, the odd class', ack: 'Sounds balanced.', set: { activity: 0.55 } },
+      { label: 'The sofa is underrated', ack: 'It really is.', set: { activity: 0.15 } },
     ],
   },
   {
@@ -81,9 +81,9 @@ export const QUESTIONS = [
     text: 'Does faith or spirituality play a part in your life?',
     traits: ['spirituality'],
     choices: [
-      { label: 'A central part', set: { spirituality: 0.9 }, tags: ['religious'] },
-      { label: 'Somewhat', set: { spirituality: 0.55 } },
-      { label: 'Not really', set: { spirituality: 0.1 } },
+      { label: 'A central part', ack: 'Thank you, I will keep that in mind.', set: { spirituality: 0.9 }, tags: ['religious'] },
+      { label: 'Somewhat', ack: 'Noted.', set: { spirituality: 0.55 } },
+      { label: 'Not really', ack: 'Noted.', set: { spirituality: 0.1 } },
     ],
   },
   {
@@ -106,9 +106,9 @@ export const QUESTIONS = [
     text: 'What are you hoping to find here?',
     traits: ['family'],
     choices: [
-      { label: 'Something long-term', set: { family: 0.65 }, tags: ['long-term'] },
-      { label: 'See where it goes', set: {} },
-      { label: 'Something casual', set: { family: 0.3 }, tags: ['casual'] },
+      { label: 'Something long-term', ack: 'Long-term. Good, that is what I do best.', set: { family: 0.65 }, tags: ['long-term'] },
+      { label: 'See where it goes', ack: 'No pressure. Good.', set: {} },
+      { label: 'Something casual', ack: 'Fair enough, I will look for the same.', set: { family: 0.3 }, tags: ['casual'] },
     ],
   },
   {
@@ -126,9 +126,9 @@ export const QUESTIONS = [
     text: 'Home on a weeknight is usually…',
     traits: ['social', 'planning'],
     choices: [
-      { label: 'Full of people', set: { social: 0.85 } },
-      { label: 'Cooking, a book, early night', set: { social: 0.3, planning: 0.65 } },
-      { label: 'Different every night', set: { planning: 0.2, adventure: 0.7 } },
+      { label: 'Full of people', ack: 'Lively.', set: { social: 0.85 } },
+      { label: 'Cooking, a book, early night', ack: 'That sounds lovely.', set: { social: 0.3, planning: 0.65 } },
+      { label: 'Different every night', ack: 'Never boring, then.', set: { planning: 0.2, adventure: 0.7 } },
     ],
   },
   {

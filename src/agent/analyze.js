@@ -28,7 +28,7 @@ const INTEREST_ALIASES = {
   hike: 'hiking', hikes: 'hiking', cook: 'cooking', read: 'reading', books: 'reading', book: 'reading',
   run: 'running', runs: 'running', movie: 'films', movies: 'films', film: 'films', cinema: 'films',
   gig: 'concerts', gigs: 'concerts', climb: 'climbing', bouldering: 'climbing', bike: 'cycling',
-  travelling: 'travel', traveling: 'travel', paint: 'art', painting: 'art', galleries: 'art',
+  travelling: 'travel', traveling: 'travel', backpacking: 'travel', trips: 'travel', paint: 'art', painting: 'art', galleries: 'art',
   boardgames: 'board games', games: 'gaming', bake: 'baking', camp: 'camping', ski: 'skiing',
   dog: 'dogs', puppy: 'dogs', cat: 'cats', plays: 'theatre', theater: 'theatre', guitar: 'music',
   piano: 'music', singing: 'music', espresso: 'coffee', museum: 'museums', poems: 'poetry',

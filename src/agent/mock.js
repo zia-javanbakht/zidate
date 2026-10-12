@@ -11,13 +11,16 @@ function hash(s) {
 
 const ACKS = ['Got it.', 'That helps.', 'Good to know.', 'Thank you, that is useful.', 'Noted.', 'I like that.'];
 
-function ack(answer, update, pending) {
+function ack(answer, update, pending, choice, previous) {
+  if (choice?.ack) return choice.ack;
   if (pending?.mode === 'partner' && pending.id?.startsWith('fb')) return 'Thanks, that will shape who I suggest next.';
   const interests = update.interests || [];
   if (interests.length >= 2) return `${cap(interests[0])} and ${interests[1]}, noted.`;
   if (interests.length === 1) return `${cap(interests[0])}, noted.`;
   if (answer.trim().split(/\s+/).length <= 2 && !pending?.choices) return 'Could you say a little more next time? Short answers are fine, but detail helps me find the right people.';
-  return ACKS[hash(answer) % ACKS.length];
+  // Never open two replies in a row the same way.
+  const options = ACKS.filter((a) => !previous?.startsWith(a));
+  return options[hash(answer) % options.length];
 }
 
 function cap(s) {
@@ -43,7 +46,7 @@ export function draftBio(user) {
 
 export const mockEngine = {
   name: 'offline',
-  async turn({ pending, answer, choiceApplied, next }) {
+  async turn({ convo, pending, answer, choiceApplied, choice, next }) {
     const update = { traitUpdates: [], preferenceUpdates: [], tags: [], dealbreakers: [], interests: [], values: [], sharedSuggestions: [] };
     const partner = pending?.mode === 'partner';
     if (!choiceApplied) {
@@ -63,7 +66,8 @@ export const mockEngine = {
       if (partner && pending?.id?.startsWith('fb')) update.privateNote = `On a suggestion: "${answer.slice(0, 160)}"`;
       if (pending?.id === 'q_partner_trait') update.privateNote = `Needs in a partner: "${answer.slice(0, 160)}"`;
     }
-    const lead = answer ? ack(answer, update, pending) : '';
+    const previous = convo?.messages.filter((m) => m.role === 'agent').at(-1)?.text;
+    const lead = answer ? ack(answer, update, pending, choice, previous) : '';
     return { update, reply: [lead, next?.text].filter(Boolean).join(' ') };
   },
 };

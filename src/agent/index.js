@@ -50,12 +50,14 @@ const BASIC_HINT = {
   city: 'Just the city name is perfect.',
 };
 
-function questionScore(q, user, answeredSelf) {
+function questionScore(q, user, answeredSelf, lastHadChoices) {
   if (q.mode === 'partner' && answeredSelf < 4) return -1;
   const conf = q.traits.map((k) => user.hidden.traits[k].confidence);
   const need = conf.length ? conf.reduce((a, c) => a + (1 - c), 0) / conf.length : 0.5;
-  // Prefer a mix: open questions early so the shared profile has something in it.
-  return need + (q.share ? 0.15 : 0) + (q.choices ? 0.05 : 0);
+  // Alternate a quick tap with a question worth typing, so it feels like a conversation
+  // rather than a form, and open answers keep feeding the shared profile.
+  const rhythm = Boolean(q.choices) !== lastHadChoices ? 0.35 : 0;
+  return need + rhythm + (q.share ? 0.1 : 0);
 }
 
 // What should the interviewer ask next?
@@ -67,8 +69,10 @@ export function nextQuestion(user, convo) {
     if (fb) return { ...fb, kind: 'feedback' };
   }
   const answeredSelf = convo.asked.filter((id) => QUESTIONS.find((q) => q.id === id)?.mode === 'self').length;
+  const lastId = [...convo.asked].reverse().find((id) => QUESTIONS.some((q) => q.id === id));
+  const lastHadChoices = Boolean(QUESTIONS.find((q) => q.id === lastId)?.choices);
   const open = QUESTIONS.filter((q) => !convo.asked.includes(q.id))
-    .map((q) => [q, questionScore(q, user, answeredSelf)])
+    .map((q) => [q, questionScore(q, user, answeredSelf, lastHadChoices)])
     .filter(([, s]) => s >= 0)
     .sort((a, b) => b[1] - a[1]);
   if (open.length) return { ...open[0][0], kind: 'interview' };
@@ -124,6 +128,7 @@ export async function respond(user, convo, rawText, engine = pickEngine()) {
     return say(convo, [lead, q.text].filter(Boolean).join(' '), q);
   }
 
+  const wasReady = isReady(user);
   // Quick replies map straight onto traits, without guessing.
   let choiceApplied = false;
   const choice = pending?.choices?.find((c) => typeof c === 'object' && c.label.toLowerCase() === text.toLowerCase());
@@ -135,15 +140,14 @@ export async function respond(user, convo, rawText, engine = pickEngine()) {
     choiceApplied = true;
   }
 
-  const wasReady = isReady(user);
   const next = nextQuestion(user, convo);
   let result;
   try {
-    result = await engine.turn({ user, convo, pending, answer: text, choiceApplied, next });
+    result = await engine.turn({ user, convo, pending, answer: text, choiceApplied, choice, next });
   } catch (err) {
     if (engine === mockEngine) throw err;
     console.warn(`[agent] ${engine.name} failed, using offline engine: ${err.message}`);
-    result = await mockEngine.turn({ user, convo, pending, answer: text, choiceApplied, next });
+    result = await mockEngine.turn({ user, convo, pending, answer: text, choiceApplied, choice, next });
   }
   applyUpdate(user, result.update);
   if (!result.update.bio) {
