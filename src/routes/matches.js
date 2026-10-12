@@ -40,11 +40,14 @@ export default function matches(ctx) {
   route('GET', '/api/matches/:id', async ({ user, params }) => {
     const m = getMatch(user, params.id);
     const other = otherOf(m, user);
-    m.seen = { ...m.seen, [user.id]: now().toISOString() };
+    const msgs = store.data.messages[m.id] || [];
+    // Everything shown is read, even a demo reply stamped a moment ahead of the clock.
+    const lastAt = msgs.at(-1)?.at || '';
+    const at = now().toISOString();
+    m.seen = { ...m.seen, [user.id]: lastAt > at ? lastAt : at };
     if (other) hub.publish(other.id, 'seen', { matchId: m.id, at: m.seen[user.id] });
     // Opening the thread reads its notifications too.
     for (const n of store.data.notifications?.[user.id] || []) if (n.link === `#/match/${encodeURIComponent(m.id)}`) n.read = true;
-    const msgs = store.data.messages[m.id] || [];
     return {
       body: {
         id: m.id,
