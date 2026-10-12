@@ -1,5 +1,6 @@
 // Weekly suggestions: exactly two people per week, picked from hidden profiles.
-import { TRAIT_KEYS } from './traits.js';
+import { TRAIT_KEYS, TOPICS } from './traits.js';
+import { basicsDone } from './profile.js';
 import { isReady, publicProfile } from './profile.js';
 import { weekKey, nextWeekStart, now } from './clock.js';
 
@@ -116,7 +117,13 @@ export function weeklyPicks(store, user) {
   const key = `${user.id}:${wk}`;
   let week = store.data.weeks[key];
   if (!week) {
-    if (!isReady(user)) return { week: wk, ready: false, picks: [], next: nextWeekStart().toISOString() };
+    if (!isReady(user)) {
+      // Tell the person what is still missing, in plain words.
+      const missing = basicsDone(user)
+        ? TRAIT_KEYS.filter((k) => user.hidden.traits[k].confidence < 0.25).slice(0, 3).map((k) => TOPICS[k])
+        : ['a few basics (who you are looking for, your age and city)'];
+      return { week: wk, ready: false, missing, picks: [], next: nextWeekStart().toISOString() };
+    }
     const seen = everSuggested(store, user.id);
     const ranked = Object.values(store.data.users)
       .filter((o) => !seen.has(o.id) && isReady(o) && eligible(user, o) && !closed(store, user, o))

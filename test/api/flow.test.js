@@ -235,3 +235,15 @@ test('demo people are labelled and reply, so a solo tester can try messaging', a
   assert.equal(thread.messages.length, 2);
   assert.equal((await c.get('/api/me')).data.user.unread, 0);
 });
+
+test('before matching unlocks, the week page says what is still missing', async () => {
+  const c = client(srv.base);
+  await c.post('/api/signup', { name: 'N', email: 'new@x.co', password: 'password1' });
+  let w = (await c.get('/api/week')).data;
+  assert.equal(w.ready, false);
+  assert.match(w.missing[0], /basics/);
+  await c.get('/api/chat');
+  for (const t of ['Woman', 'Men', '30', 'Paris']) await c.post('/api/chat', { text: t });
+  w = (await c.get('/api/week')).data;
+  assert.equal(w.missing.length, 3);
+});

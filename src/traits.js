@@ -12,6 +12,18 @@ export const TRAITS = {
   activity: { low: 'relaxed pace', high: 'very active' },
 };
 
+// How the interviewer refers to each area when talking to the person.
+export const TOPICS = {
+  social: 'how you like to spend time with people',
+  adventure: 'how much you like new things',
+  ambition: 'where work fits in your life',
+  family: 'family and the future',
+  planning: 'plans versus spontaneity',
+  intellect: 'what gets you thinking',
+  spirituality: 'faith and spirituality',
+  activity: 'how active you are',
+};
+
 export const TRAIT_KEYS = Object.keys(TRAITS);
 
 // Tags the agent may record. Dealbreakers are matched against the other person's tags.

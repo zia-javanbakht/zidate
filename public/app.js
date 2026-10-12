@@ -236,6 +236,7 @@ async function week() {
     render(h('div', { class: 'empty stack' },
       h('h2', {}, 'Not yet.'),
       h('p', { class: 'muted' }, 'I need to know you a little better before I introduce anyone. A few more answers will do it.'),
+      data.missing?.length ? h('p', { class: 'small muted' }, `Still to talk about: ${data.missing.join('; ')}.`) : null,
       me ? progress(me.completeness) : null,
       h('a', { class: 'btn', href: '#/talk' }, 'Keep talking')));
     return;
@@ -266,7 +267,9 @@ async function week() {
     },
   }));
   render(h('div', { class: 'stack' },
-    h('div', {}, h('h1', {}, 'This week'), h('p', { class: 'muted' }, `Two people, chosen for you. Next pair ${relTime(data.next)}.`)),
+    h('div', {}, h('h1', {}, 'This week'), h('p', { class: 'muted' }, data.picks.every((p) => p.decision)
+      ? `That is this week done. Your next two arrive ${relTime(data.next)}. Talking more in the meantime makes them better.`
+      : `Two people, chosen for you. Next pair ${relTime(data.next)}.`)),
     h('div', { class: 'picks two' }, cards)));
   main.className = 'wide';
 }
