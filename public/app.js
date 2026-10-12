@@ -138,7 +138,10 @@ async function talk() {
   messages.forEach(add);
 
   function showChips(m) {
-    chips.replaceChildren(...(m?.choices || []).map((c) => h('button', { class: 'chip', type: 'button', onclick: () => send(c) }, c)));
+    const list = (m?.choices || []).map((c) => h('button', { class: 'chip', type: 'button', onclick: () => send(c) }, c));
+    // Any interview question can be skipped; the basics cannot.
+    if (m?.qid && !m.qid.startsWith('b_')) list.push(h('button', { class: 'chip quiet', type: 'button', onclick: () => send('Skip') }, 'Skip'));
+    chips.replaceChildren(...list);
   }
   showChips(messages.at(-1));
 

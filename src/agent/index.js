@@ -15,6 +15,8 @@ export function newConversation() {
   return { messages: [], asked: [], pending: null, events: [], flags: {} };
 }
 
+const SKIP_RE = /^(skip|skip (it|this|this one)|pass|next( question)?|rather not( say)?|i'?d rather not( say)?|prefer not to say|no comment)[.!]?$/i;
+const NOT_A_CITY = /^(skip|pass|next|no|nope|none|idk|why|what|nowhere|secret|private|rather not( say)?|not telling|hi|hello|hey|yes|ok|okay)$/i;
 const CITY_RE = /^[\p{L}][\p{L} .'-]{1,40}$/u;
 
 function parseBasic(key, text) {
@@ -37,7 +39,7 @@ function parseBasic(key, text) {
   }
   if (key === 'city') {
     const c = text.trim().replace(/^i('| a)m in |^in /i, '').replace(/[.!]$/, '');
-    if (!CITY_RE.test(c)) return null;
+    if (!CITY_RE.test(c) || NOT_A_CITY.test(c)) return null;
     return c.replace(/\b\p{L}/gu, (ch) => ch.toUpperCase());
   }
   return null;
@@ -47,7 +49,7 @@ const BASIC_HINT = {
   gender: 'Please pick one of the options.',
   seeking: 'Please pick one of the options.',
   age: 'Just the number is perfect, for example 31.',
-  city: 'Just the city name is perfect.',
+  city: 'I need your city to suggest people near you. Just the name is perfect.',
 };
 
 function questionScore(q, user, answeredSelf, lastHadChoices) {
@@ -126,6 +128,12 @@ export async function respond(user, convo, rawText, engine = pickEngine()) {
     const q = nextQuestion(user, convo);
     const lead = basicsDone(user) ? 'Thanks, that is all the admin. Now the interesting part.' : '';
     return say(convo, [lead, q.text].filter(Boolean).join(' '), q);
+  }
+
+  // Every interview question is optional.
+  if (SKIP_RE.test(text) && pending && pending.kind !== 'basic') {
+    const q = nextQuestion(user, convo);
+    return say(convo, `No problem, we can skip that. ${q.text}`, q);
   }
 
   const wasReady = isReady(user);

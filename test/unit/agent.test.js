@@ -46,3 +46,26 @@ test('replies never open the same way twice in a row, and quick replies get thei
   }
   for (let i = 1; i < openers.length; i++) assert.notEqual(openers[i], openers[i - 1]);
 });
+
+test('any interview question can be skipped, without guessing from the word "skip"', async () => {
+  const u = user();
+  const convo = newConversation();
+  const { opening } = await import('../../src/agent/index.js');
+  opening(u, convo);
+  const before = JSON.stringify(u.hidden);
+  const first = convo.pending.id;
+  const msg = await respond(u, convo, 'Skip', mockEngine);
+  assert.match(msg.text, /skip that/);
+  assert.notEqual(convo.pending.id, first);
+  assert.equal(JSON.stringify(u.hidden), before);
+});
+
+test('basics cannot be skipped', async () => {
+  const u = user();
+  u.basics.city = null;
+  const convo = newConversation();
+  const { opening } = await import('../../src/agent/index.js');
+  opening(u, convo);
+  const msg = await respond(u, convo, 'skip', mockEngine);
+  assert.match(msg.text, /city/i);
+});
