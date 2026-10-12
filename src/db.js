@@ -14,8 +14,21 @@ export class Store {
     this.data = blank();
     this.pending = null;
     if (file && fs.existsSync(file)) {
-      this.data = { ...blank(), ...JSON.parse(fs.readFileSync(file, 'utf8')) };
+      try {
+        this.data = { ...blank(), ...JSON.parse(fs.readFileSync(file, 'utf8')) };
+      } catch (err) {
+        // Keep the damaged file for recovery rather than crashing or overwriting it.
+        const aside = `${file}.corrupt-${Date.now()}`;
+        fs.renameSync(file, aside);
+        console.error(`[db] could not read ${file} (${err.message}); moved it to ${aside} and started empty.`);
+      }
     }
+    this.pruneSessions();
+  }
+
+  pruneSessions() {
+    const t = Date.now();
+    for (const [token, s] of Object.entries(this.data.sessions)) if (s.expires <= t) delete this.data.sessions[token];
   }
 
   id(prefix) {
