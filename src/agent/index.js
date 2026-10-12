@@ -1,10 +1,11 @@
 // The conversation loop: decides what to ask next, hands answers to an engine
 // (Claude or offline), and applies the result to the person's profiles.
-import { BASICS, QUESTIONS, feedbackQuestion } from './questions.js';
+import { BASICS, QUESTIONS, DEEPER, feedbackQuestion } from './questions.js';
 import { mockEngine, draftBio } from './mock.js';
 import { claudeEngine } from './claude.js';
 import { applyUpdate, completeness, isReady, basicsDone, cleanText } from '../profile.js';
 import { now } from '../clock.js';
+import { normalizeCity } from '../cities.js';
 
 export function pickEngine() {
   if (process.env.ZIDATE_AGENT === 'offline') return mockEngine;
@@ -17,7 +18,6 @@ export function newConversation() {
 
 const SKIP_RE = /^(skip|skip (it|this|this one)|pass|next( question)?|rather not( say)?|i'?d rather not( say)?|prefer not to say|no comment)[.!]?$/i;
 const NOT_A_CITY = /^(skip|pass|next|no|nope|none|idk|why|what|nowhere|secret|private|rather not( say)?|not telling|hi|hello|hey|yes|ok|okay)$/i;
-const CITY_RE = /^[\p{L}][\p{L} .'-]{1,40}$/u;
 
 function parseBasic(key, text) {
   const t = text.trim().toLowerCase();
@@ -39,8 +39,8 @@ function parseBasic(key, text) {
   }
   if (key === 'city') {
     const c = text.trim().replace(/^i('| a)m in |^in /i, '').replace(/[.!]$/, '');
-    if (!CITY_RE.test(c) || NOT_A_CITY.test(c)) return null;
-    return c.replace(/\b\p{L}/gu, (ch) => ch.toUpperCase());
+    if (!/^[\p{L}][\p{L} .,'-]{1,50}$/u.test(c) || NOT_A_CITY.test(c)) return null;
+    return normalizeCity(c);
   }
   return null;
 }
@@ -71,13 +71,18 @@ export function nextQuestion(user, convo) {
     if (fb) return { ...fb, kind: 'feedback' };
   }
   const answeredSelf = convo.asked.filter((id) => QUESTIONS.find((q) => q.id === id)?.mode === 'self').length;
-  const lastId = [...convo.asked].reverse().find((id) => QUESTIONS.some((q) => q.id === id));
-  const lastHadChoices = Boolean(QUESTIONS.find((q) => q.id === lastId)?.choices);
+  const lastId = [...convo.asked].reverse().find((id) => QUESTIONS.some((q) => q.id === id) || DEEPER.some((q) => q.id === id));
+  const lastHadChoices = Boolean([...QUESTIONS, ...DEEPER].find((q) => q.id === lastId)?.choices);
   const open = QUESTIONS.filter((q) => !convo.asked.includes(q.id))
     .map((q) => [q, questionScore(q, user, answeredSelf, lastHadChoices)])
     .filter(([, s]) => s >= 0)
     .sort((a, b) => b[1] - a[1]);
   if (open.length) return { ...open[0][0], kind: 'interview' };
+  // Core interview done: go deeper where we know least.
+  const deeper = DEEPER.filter((q) => !convo.asked.includes(q.id))
+    .map((q) => [q, questionScore(q, user, answeredSelf, lastHadChoices)])
+    .sort((a, b) => b[1] - a[1]);
+  if (deeper.length) return { ...deeper[0][0], kind: 'interview' };
   return { id: 'q_open', kind: 'open', mode: 'self', text: 'Is there anything else you would like me to know about you, or about who you hope to meet?' };
 }
 
@@ -158,6 +163,16 @@ export async function respond(user, convo, rawText, engine = pickEngine()) {
     console.warn(`[agent] ${engine.name} failed, using offline engine: ${err.message}`);
     result = await mockEngine.turn({ user, convo, pending, answer: text, choiceApplied, choice, next });
   }
+  // A clear answer that contradicts something we were fairly sure of: ask, don't guess.
+  convo.flags.rechecked ||= {};
+  for (const t of result.update.traitUpdates || []) {
+    const before = user.hidden.traits[t.trait];
+    if (!before || convo.flags.rechecked[t.trait]) continue;
+    if (before.confidence >= 0.45 && t.confidence >= 0.3 && Math.abs(t.value - before.value) > 0.55) {
+      convo.flags.rechecked[t.trait] = true;
+      queueEvent(convo, { type: 'recheck', trait: t.trait });
+    }
+  }
   applyUpdate(user, result.update);
   if (!result.update.bio) {
     const bio = draftBio(user);
@@ -174,6 +189,18 @@ export async function respond(user, convo, rawText, engine = pickEngine()) {
   return say(convo, reply, next);
 }
 
+// After a day or more away, greet the person and repeat where we were.
+export function resume(user, convo) {
+  const last = convo.messages.at(-1);
+  if (!last || !convo.pending || user.blocked) return null;
+  if (Date.parse(now().toISOString()) - Date.parse(last.at) < 20 * 3600e3) return null;
+  const q = { ...convo.pending, kind: convo.pending.kind };
+  const msg = { role: 'agent', text: `Welcome back, ${user.name}. Where were we… ${q.text}`, at: now().toISOString(), qid: q.id };
+  if (q.choices) msg.choices = choiceLabels(q);
+  convo.messages.push(msg);
+  return msg;
+}
+
 // Ask the next queued question straight away, e.g. after "That's not me".
 // The question that was pending goes back into the pool.
 export function askNow(user, convo) {
@@ -184,7 +211,7 @@ export function askNow(user, convo) {
 
 export function queueEvent(convo, event) {
   // One question per person per week is plenty; drop duplicates.
-  if (convo.events.some((e) => e.candidateId === event.candidateId && e.type === event.type)) return;
+  if (convo.events.some((e) => e.type === event.type && e.candidateId === event.candidateId && e.trait === event.trait)) return;
   convo.events.push(event);
 }
 

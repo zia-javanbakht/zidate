@@ -124,10 +124,29 @@ export function isReady(user) {
   return basicsDone(user) && completeness(user) >= READY;
 }
 
+// A plain-language summary of what the matchmaker has learned, for the person themselves.
+export function summarize(user) {
+  const t = user.hidden.traits;
+  const sure = TRAIT_KEYS.filter((k) => t[k].confidence >= 0.3 && Math.abs(t[k].value - 0.5) > 0.12)
+    .sort((a, b) => t[b].confidence - t[a].confidence)
+    .map((k) => (t[k].value > 0.5 ? TRAITS[k].high : TRAITS[k].low));
+  const parts = [];
+  if (sure.length) parts.push(`So far you come across as ${listJoin(sure.slice(0, 4))}.`);
+  const prefs = Object.entries(user.hidden.preference || {}).filter(([, p]) => p.confidence >= 0.2 && Math.abs(p.value - 0.5) > 0.15);
+  if (prefs.length) parts.push(`In a partner you have said you lean toward someone ${listJoin(prefs.map(([k, p]) => (p.value > 0.5 ? TRAITS[k].high : TRAITS[k].low)))}.`);
+  if (user.hidden.dealbreakers.length) parts.push(`Dealbreakers: ${listJoin(user.hidden.dealbreakers.map((d) => d.replace(/-/g, ' ')))}.`);
+  return parts.join(' ') || 'Still getting to know you. A few more answers and I will be able to describe you.';
+}
+
+function listJoin(list) {
+  return list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list.at(-1)}` : list[0] || '';
+}
+
 // What the person themselves can see about their hidden profile.
 export function describeHidden(user) {
   const h = user.hidden;
   return {
+    summary: summarize(user),
     traits: TRAIT_KEYS.map((k) => ({
       key: k,
       value: Math.round(h.traits[k].value * 100) / 100,
@@ -143,8 +162,20 @@ export function describeHidden(user) {
   };
 }
 
+export function settingsOf(user) {
+  user.settings ||= {};
+  const s = user.settings;
+  s.paused ??= false;
+  s.photosAfterMatch ??= true;
+  s.email ||= {};
+  for (const k of ['picks', 'match', 'message']) s.email[k] ??= true;
+  return s;
+}
+
 // What another person sees. Only approved items; never anything hidden.
-export function publicProfile(user) {
+// showPhotos: whether this viewer may see the photos (the owner can keep them until a match).
+export function publicProfile(user, { showPhotos = false } = {}) {
+  const photos = user.photos || [];
   return {
     id: user.id,
     name: user.name,
@@ -153,6 +184,8 @@ export function publicProfile(user) {
     bio: user.shared.bio || '',
     interests: user.shared.interests,
     items: user.shared.items.filter((i) => i.status === 'approved').map(({ prompt, text }) => ({ prompt, text })),
+    photos: showPhotos ? photos.map((p) => `/api/photos/${p.id}`) : [],
+    photosHidden: !showPhotos && photos.length > 0,
     ...(user.demo ? { demo: true } : {}),
   };
 }

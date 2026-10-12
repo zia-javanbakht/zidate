@@ -155,6 +155,47 @@ export const QUESTIONS = [
 
 import { TRAITS } from '../traits.js';
 
+// Deeper questions, asked once the core interview is done. Two per trait, so the
+// matchmaker always has something worth asking about whatever it knows least.
+export const DEEPER = [
+  { id: 'd_social1', mode: 'self', traits: ['social'], text: 'At a party where you know one person, what do you usually end up doing?' },
+  { id: 'd_social2', mode: 'self', traits: ['social'], share: 'How my friends describe me', text: 'How would your closest friends describe you in a sentence?' },
+  { id: 'd_adventure1', mode: 'self', traits: ['adventure'], text: 'What is something you tried for the first time in the last year?' },
+  { id: 'd_adventure2', mode: 'self', traits: ['adventure'], text: 'Same favourite restaurant every time, or somewhere new?', choices: [
+    { label: 'Same place, same dish', ack: 'A regular. Noted.', set: { adventure: 0.2 } },
+    { label: 'Depends on the mood', ack: 'Fair.', set: { adventure: 0.5 } },
+    { label: 'Always somewhere new', ack: 'An explorer.', set: { adventure: 0.85 } },
+  ] },
+  { id: 'd_ambition1', mode: 'self', traits: ['ambition'], share: 'Where I want to be in five years', text: 'Where would you like to be in five years?' },
+  { id: 'd_ambition2', mode: 'self', traits: ['ambition'], text: 'A Friday evening work email arrives. You…', choices: [
+    { label: 'Answer it now', ack: 'Committed.', set: { ambition: 0.85 } },
+    { label: 'Glance, reply Monday', ack: 'Balanced.', set: { ambition: 0.5 } },
+    { label: 'What email?', ack: 'Boundaries. Good.', set: { ambition: 0.15 } },
+  ] },
+  { id: 'd_family1', mode: 'self', traits: ['family'], text: 'How close are you to your family, and how often do you see them?' },
+  { id: 'd_family2', mode: 'self', traits: ['family'], share: 'A tradition I want to keep', text: 'Is there a family tradition you would love to keep going?' },
+  { id: 'd_planning1', mode: 'self', traits: ['planning'], text: 'Holidays: booked months ahead, or decided at the airport?', choices: [
+    { label: 'Months ahead', ack: 'A planner.', set: { planning: 0.9 } },
+    { label: 'A rough plan', ack: 'Sensible.', set: { planning: 0.55 } },
+    { label: 'At the airport', ack: 'Brave.', set: { planning: 0.1, adventure: 0.8 } },
+  ] },
+  { id: 'd_planning2', mode: 'self', traits: ['planning'], text: 'What does your calendar look like for next weekend?' },
+  { id: 'd_intellect1', mode: 'self', traits: ['intellect'], share: 'Something that changed my mind', text: 'What is a book, film or conversation that changed your mind about something?' },
+  { id: 'd_intellect2', mode: 'self', traits: ['intellect'], text: 'Would you rather spend an evening debating an idea or building something with your hands?', choices: [
+    { label: 'Debating an idea', ack: 'A thinker.', set: { intellect: 0.85 } },
+    { label: 'A bit of both', ack: 'Both is good.', set: { intellect: 0.55 } },
+    { label: 'Building something', ack: 'Hands-on. Noted.', set: { intellect: 0.2 } },
+  ] },
+  { id: 'd_spirit1', mode: 'self', traits: ['spirituality'], text: 'Would you want a partner who shares your view on faith?', choices: [
+    { label: 'Yes, it matters', ack: 'Understood.', set: { spirituality: 0.7 } },
+    { label: 'Respect is enough', ack: 'Respect it is.', set: {} },
+    { label: 'I would rather not', ack: 'Noted.', set: { spirituality: 0.15 } },
+  ] },
+  { id: 'd_spirit2', mode: 'self', traits: ['spirituality'], text: 'What helps you feel grounded when life gets busy?' },
+  { id: 'd_activity1', mode: 'self', traits: ['activity'], share: 'How I like to spend a free afternoon', text: 'You have a free afternoon and good weather. What happens?' },
+  { id: 'd_activity2', mode: 'self', traits: ['activity'], text: 'What is the most physically tired you have been, in a good way?' },
+];
+
 // Asked after the person reacts to a weekly suggestion. Answers update preferences.
 export function feedbackQuestion(event) {
   if (event.type === 'pass') {
@@ -175,6 +216,9 @@ export function feedbackQuestion(event) {
         { label: cap(t.high), ack: 'Thank you, fixed.', set: { [event.trait]: 0.85 } },
       ],
     };
+  }
+  if (event.type === 'checkin') {
+    return { id: `ci_${event.candidateId}`, mode: 'partner', text: `It has been a week since you matched with ${event.name}. Did you talk or meet? How is it going?` };
   }
   if (event.type === 'match') {
     return { id: `fbm_${event.candidateId}`, mode: 'partner', text: `You and ${event.name} matched. Once you have talked a bit, tell me how it feels.` };

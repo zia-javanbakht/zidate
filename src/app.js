@@ -1,26 +1,34 @@
-// HTTP API and static file server. No framework: a small router over node:http.
+// The web app: wires services together, serves the API and the static client.
+// Routes live in src/routes/*, one file per area.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hashPassword, verifyPassword, newToken, parseCookies } from './auth.js';
+import { hashPassword, newToken, parseCookies } from './auth.js';
 import { emptyHidden } from './traits.js';
-import { respond, opening, newConversation, queueEvent, pickEngine, askNow } from './agent/index.js';
-import { basicsDone, completeness, isReady, describeHidden, publicProfile, cleanText, blendTrait, hasContactInfo } from './profile.js';
-import { weeklyPicks, matchId, compatibility } from './matching.js';
-import { weekKey, now } from './clock.js';
-import { TRAIT_KEYS } from './traits.js';
+import { newConversation, pickEngine } from './agent/index.js';
+import { completeness, isReady, settingsOf } from './profile.js';
+import { HttpError, readBody, send, router, limiter } from './http.js';
+import { createHub } from './events.js';
+import { createMailer } from './mailer.js';
+import { createPhotoStore } from './photos.js';
+import { now } from './clock.js';
+import account from './routes/account.js';
+import chat from './routes/chat.js';
+import profile from './routes/profile.js';
+import week from './routes/week.js';
+import matches from './routes/matches.js';
+import notifications from './routes/notifications.js';
+import admin from './routes/admin.js';
 
-const PUBLIC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' };
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const PUBLIC = path.join(ROOT, 'public');
+export const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
+const MIME = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json', '.png': 'image/png',
+};
 const SESSION_DAYS = 30;
-const NO_CONTACT = 'Keep contact details off your profile. You can share them once you match.';
-
-class HttpError extends Error {
-  constructor(status, message) {
-    super(message);
-    this.status = status;
-  }
-}
+const LIMITS = { auth: 10, chat: 40, write: 120 };
 
 export function newUser(store, { name, email, password }) {
   const id = store.id('u');
@@ -28,363 +36,95 @@ export function newUser(store, { name, email, password }) {
     id,
     name,
     email,
+    emailVerified: false,
     password: password ? hashPassword(password) : null,
     createdAt: now().toISOString(),
     basics: { gender: null, seeking: null, age: null, city: null },
     hidden: emptyHidden(),
     shared: { bio: '', bioDraft: '', interests: [], items: [] },
+    photos: [],
   };
+  settingsOf(user);
   store.data.users[id] = user;
   store.data.conversations[id] = newConversation();
   return user;
 }
 
-function readBody(req, limit = 32 * 1024) {
-  return new Promise((resolve, reject) => {
-    let size = 0;
-    const chunks = [];
-    req.on('data', (c) => {
-      size += c.length;
-      if (size > limit) {
-        reject(new HttpError(413, 'Too much data.'));
-        req.destroy();
-      } else chunks.push(c);
-    });
-    req.on('end', () => {
-      if (!chunks.length) return resolve({});
-      try {
-        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
-      } catch {
-        reject(new HttpError(400, 'Invalid JSON.'));
-      }
-    });
-    req.on('error', reject);
-  });
-}
-
-function send(res, status, body, headers = {}) {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers });
-  res.end(JSON.stringify(body));
-}
-
-function meView(user, store) {
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    basics: user.basics,
-    completeness: completeness(user),
-    ready: isReady(user),
-    engine: pickEngine().name,
-    unread: unreadCount(store, user.id),
-  };
-}
-
-function unreadCount(store, uid) {
-  let n = 0;
-  for (const m of Object.values(store.data.matches)) {
-    if (!m.users.includes(uid)) continue;
-    const seen = m.seen?.[uid] || '';
-    // A brand-new match counts as something to look at.
-    if (!seen) n += 1;
-    n += (store.data.messages[m.id] || []).filter((msg) => msg.from !== uid && msg.at > seen).length;
-  }
-  return n;
-}
-
-// Liking someone is also a signal: nudge preferences a little toward them.
-function learnFromLike(user, other) {
-  for (const k of TRAIT_KEYS) {
-    const t = other.hidden.traits[k];
-    if (t.confidence < 0.2) continue;
-    user.hidden.preference[k] = blendTrait(user.hidden.preference[k] || { value: 0.5, confidence: 0 }, t.value, 0.12);
-  }
-}
-
-// Demo people answer so a solo tester can try the whole flow. Clearly labelled as demo.
-function demoReply(demo, user, thread) {
-  const mine = thread.filter((x) => x.from === demo.id).length;
-  const interest = demo.shared.interests.find((i) => user.shared.interests.includes(i)) || demo.shared.interests[0];
-  const lines = [
-    `Hi ${user.name}! Nice to match. I saw you are in ${user.basics.city}, how are you finding it?`,
-    `Ha, fair. I have been really into ${interest} lately. Are you?`,
-    'What does a good week look like for you?',
-    'I like that. Coffee sometime? (I am a demo profile, so this is where the demo ends.)',
-  ];
-  return lines[Math.min(mine, lines.length - 1)];
-}
-
-function createMatch(store, a, b) {
-  const id = matchId(a.id, b.id);
-  if (store.data.matches[id]) return store.data.matches[id];
-  // The person who completed the match sees it straight away, so it is not "new" for them.
-  const m = { id, users: [a.id, b.id], createdAt: now().toISOString(), seen: { [a.id]: now().toISOString() } };
-  store.data.matches[id] = m;
-  store.data.messages[id] = [];
-  for (const [x, y] of [[a, b], [b, a]]) {
-    if (!x.demo) queueEvent(store.data.conversations[x.id], { type: 'match', candidateId: y.id, name: y.name });
-  }
-  return m;
-}
-
-// Fixed-window rate limiter, per client and bucket.
-function limiter() {
-  const hits = new Map();
-  return (key, max, windowMs = 60000) => {
-    const t = Date.now();
-    const h = hits.get(key);
-    if (!h || t - h.start > windowMs) {
-      hits.set(key, { start: t, n: 1 });
-      if (hits.size > 10000) hits.clear();
-      return true;
-    }
-    return ++h.n <= max;
-  };
-}
-
-const LIMITS = { auth: 10, chat: 40, write: 120 };
-
-export function createApp(store, { secureCookies = false, limits = LIMITS } = {}) {
+export function createApp(store, opts = {}) {
+  const {
+    secureCookies = false,
+    limits = LIMITS,
+    admins = [],
+    mailer = createMailer(),
+    photoDir = null,
+    baseUrl = 'http://localhost:3000',
+    log = false,
+  } = opts;
   const allow = limiter();
-  const routes = [];
-  const route = (method, pattern, handler, opts = {}) => {
-    const keys = [];
-    const re = new RegExp(`^${pattern.replace(/:(\w+)/g, (_, k) => (keys.push(k), '([^/]+)'))}$`);
-    routes.push({ method, re, keys, handler, auth: opts.auth !== false });
-  };
+  const { route, match } = router();
+  const hub = createHub();
+  const photos = createPhotoStore(photoDir);
 
   const cookie = (token, maxAge) => `sid=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secureCookies ? '; Secure' : ''}`;
+  const isAdmin = (user) => Boolean(user && admins.includes(user.email));
 
-  function startSession(user) {
-    const token = newToken();
-    store.data.sessions[token] = { userId: user.id, expires: Date.now() + SESSION_DAYS * 864e5 };
-    return cookie(token, SESSION_DAYS * 86400);
-  }
-
-  // --- accounts ---
-  route('POST', '/api/signup', async ({ body }) => {
-    const name = cleanText(body.name, 40);
-    const email = String(body.email || '').trim().toLowerCase();
-    const password = String(body.password || '');
-    if (!name) throw new HttpError(400, 'What should I call you?');
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new HttpError(400, 'That email does not look right.');
-    if (password.length < 8) throw new HttpError(400, 'Use at least 8 characters for your password.');
-    if (Object.values(store.data.users).some((u) => u.email === email)) throw new HttpError(409, 'That email already has an account. Try signing in.');
-    const user = newUser(store, { name, email, password });
-    return { status: 201, body: { user: meView(user, store) }, headers: { 'Set-Cookie': startSession(user) } };
-  }, { auth: false });
-
-  route('POST', '/api/login', async ({ body }) => {
-    const email = String(body.email || '').trim().toLowerCase();
-    const user = Object.values(store.data.users).find((u) => u.email === email);
-    if (!user || !user.password || !verifyPassword(String(body.password || ''), user.password)) {
-      throw new HttpError(401, 'Email or password is wrong.');
-    }
-    return { body: { user: meView(user, store) }, headers: { 'Set-Cookie': startSession(user) } };
-  }, { auth: false });
-
-  route('POST', '/api/logout', async ({ token }) => {
-    delete store.data.sessions[token];
-    return { body: { ok: true }, headers: { 'Set-Cookie': cookie('', 0) } };
-  });
-
-  // Signed-out is a normal state for this endpoint, not an error.
-  route('GET', '/api/me', async ({ user }) => ({ body: { user: user ? meView(user, store) : null } }), { auth: false });
-
-  route('DELETE', '/api/me', async ({ user }) => {
-    const id = user.id;
-    delete store.data.users[id];
-    delete store.data.conversations[id];
-    for (const [t, s] of Object.entries(store.data.sessions)) if (s.userId === id) delete store.data.sessions[t];
-    for (const k of Object.keys(store.data.weeks)) if (k.startsWith(`${id}:`)) delete store.data.weeks[k];
-    for (const table of [store.data.likes, store.data.passes, store.data.blocks]) {
-      for (const k of Object.keys(table)) if (k.split('>').includes(id)) delete table[k];
-    }
-    for (const [mid, m] of Object.entries(store.data.matches)) {
-      if (m.users.includes(id)) {
-        delete store.data.matches[mid];
-        delete store.data.messages[mid];
-      }
-    }
-    return { body: { ok: true }, headers: { 'Set-Cookie': cookie('', 0) } };
-  });
-
-  // --- conversation with the interviewer ---
-  route('GET', '/api/chat', async ({ user }) => {
-    const convo = store.data.conversations[user.id];
-    opening(user, convo);
-    return { body: { messages: convo.messages, me: meView(user, store) } };
-  });
-
-  route('POST', '/api/chat', async ({ user, body }) => {
-    if (user.blocked) throw new HttpError(403, 'This account cannot continue.');
-    const convo = store.data.conversations[user.id];
-    opening(user, convo);
-    const start = convo.messages.length + 1; // after the person's own message
-    const message = await respond(user, convo, body.text);
-    return { body: { message, messages: convo.messages.slice(start), me: meView(user, store) } };
-  });
-
-  // --- profiles ---
-  route('GET', '/api/profile', async ({ user }) => ({
-    body: {
-      shared: user.shared,
-      preview: publicProfile(user),
-      hidden: describeHidden(user),
-      me: meView(user, store),
+  const ctx = {
+    store, route, hub, mailer, photos, baseUrl, HttpError, isAdmin,
+    newUser: (o) => newUser(store, o),
+    cookie,
+    startSession(user) {
+      const token = newToken();
+      store.data.sessions[token] = { userId: user.id, expires: Date.now() + SESSION_DAYS * 864e5, createdAt: now().toISOString() };
+      return cookie(token, SESSION_DAYS * 86400);
     },
-  }));
+    endSessions(userId, except = null) {
+      for (const [t, s] of Object.entries(store.data.sessions)) if (s.userId === userId && t !== except) delete store.data.sessions[t];
+    },
+    meView(user) {
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        emailVerified: Boolean(user.emailVerified),
+        basics: user.basics,
+        settings: settingsOf(user),
+        completeness: completeness(user),
+        ready: isReady(user),
+        engine: pickEngine().name,
+        unread: unreadCount(user.id),
+        notifications: (store.data.notifications[user.id] || []).filter((n) => !n.read).length,
+        admin: isAdmin(user),
+      };
+    },
+    // In-app notification, pushed live; emailed when the person is not online and wants that kind.
+    notify(user, { type, text, link }) {
+      if (!user || user.demo) return null;
+      const list = (store.data.notifications[user.id] ||= []);
+      const n = { id: store.id('n'), type, text, link, at: now().toISOString(), read: false };
+      list.unshift(n);
+      list.splice(50);
+      hub.publish(user.id, 'notification', n);
+      const wants = settingsOf(user).email[type];
+      if (wants && hub.count(user.id) === 0) {
+        mailer.send({ to: user.email, subject: `ziDate: ${text}`, text: `${text}\n\n${baseUrl}/${link || ''}\n\nYou can change which emails you get under You > Settings.` });
+      }
+      return n;
+    },
+  };
 
-  route('POST', '/api/profile/items/approve-all', async ({ user }) => {
+  function unreadCount(uid) {
     let n = 0;
-    for (const i of user.shared.items) if (i.status === 'suggested') (i.status = 'approved'), n++;
-    return { body: { approved: n } };
-  });
-
-  route('PATCH', '/api/profile/items/:id', async ({ user, params, body }) => {
-    const item = user.shared.items.find((i) => i.id === params.id);
-    if (!item) throw new HttpError(404, 'Not found.');
-    if (body.status) {
-      if (!['approved', 'hidden', 'suggested'].includes(body.status)) throw new HttpError(400, 'Unknown status.');
-      item.status = body.status;
+    for (const m of Object.values(store.data.matches)) {
+      if (!m.users.includes(uid)) continue;
+      const seen = m.seen?.[uid] || '';
+      if (!seen) n += 1; // a brand-new match counts as something to look at
+      n += (store.data.messages[m.id] || []).filter((msg) => msg.from !== uid && msg.at > seen).length;
     }
-    if (typeof body.text === 'string') {
-      const text = cleanText(body.text, 300);
-      if (!text) throw new HttpError(400, 'It cannot be empty.');
-      if (hasContactInfo(text)) throw new HttpError(400, NO_CONTACT);
-      item.text = text;
-    }
-    return { body: { item } };
-  });
-
-  route('DELETE', '/api/profile/items/:id', async ({ user, params }) => {
-    user.shared.items = user.shared.items.filter((i) => i.id !== params.id);
-    return { body: { ok: true } };
-  });
-
-  route('PUT', '/api/profile/bio', async ({ user, body }) => {
-    const bio = cleanText(body.useDraft ? user.shared.bioDraft : body.text, 400);
-    if (hasContactInfo(bio)) throw new HttpError(400, NO_CONTACT);
-    user.shared.bio = bio;
-    if (body.useDraft) user.shared.bioDraft = '';
-    return { body: { bio: user.shared.bio } };
-  });
-
-  // "That's not me": forget most of what we inferred and ask directly.
-  route('POST', '/api/profile/traits/:key/recheck', async ({ user, params }) => {
-    const t = user.hidden.traits[params.key];
-    if (!t) throw new HttpError(404, 'Not found.');
-    user.hidden.traits[params.key] = { value: 0.5, confidence: t.confidence * 0.3 };
-    const convo = store.data.conversations[user.id];
-    convo.events = convo.events.filter((e) => !(e.type === 'recheck' && e.trait === params.key));
-    convo.events.unshift({ type: 'recheck', trait: params.key });
-    if (basicsDone(user)) askNow(user, convo);
-    return { body: { ok: true } };
-  });
-
-  route('DELETE', '/api/profile/interests/:name', async ({ user, params }) => {
-    const name = decodeURIComponent(params.name);
-    user.shared.interests = user.shared.interests.filter((i) => i !== name);
-    return { body: { interests: user.shared.interests } };
-  });
-
-  // --- weekly suggestions ---
-  route('GET', '/api/week', async ({ user }) => ({ body: weeklyPicks(store, user) }));
-
-  route('POST', '/api/week/:id', async ({ user, params, body }) => {
-    const decision = body.decision;
-    if (!['like', 'pass'].includes(decision)) throw new HttpError(400, 'Decide like or pass.');
-    const week = store.data.weeks[`${user.id}:${weekKey()}`];
-    const pick = week?.picks.find((p) => p.id === params.id);
-    if (!pick) throw new HttpError(404, 'That person is not in your suggestions this week.');
-    if (pick.decision) throw new HttpError(409, 'You already decided.');
-    const other = store.data.users[params.id];
-    if (!other) throw new HttpError(404, 'That person has left.');
-    pick.decision = decision;
-    const convo = store.data.conversations[user.id];
-    let match = null;
-    if (decision === 'pass') store.data.passes[`${user.id}>${other.id}`] = now().toISOString();
-    if (decision === 'like') {
-      store.data.likes[`${user.id}>${other.id}`] = now().toISOString();
-      learnFromLike(user, other);
-      // Demo people answer instantly, and only if they would like this person too.
-      if (other.demo && compatibility(other, user) >= 0.6) store.data.likes[`${other.id}>${user.id}`] = now().toISOString();
-      if (store.data.likes[`${other.id}>${user.id}`]) match = createMatch(store, user, other);
-    }
-    if (!match) queueEvent(convo, { type: decision, candidateId: other.id, name: other.name });
-    return { body: { decision, match: match ? { id: match.id } : null } };
-  });
-
-  // --- matches and messages ---
-  function getMatch(user, id) {
-    const m = store.data.matches[id];
-    if (!m || !m.users.includes(user.id)) throw new HttpError(404, 'Not found.');
-    return m;
+    return n;
   }
 
-  route('GET', '/api/matches', async ({ user }) => {
-    const list = Object.values(store.data.matches)
-      .filter((m) => m.users.includes(user.id))
-      .map((m) => {
-        const other = store.data.users[m.users.find((u) => u !== user.id)];
-        const msgs = store.data.messages[m.id] || [];
-        const last = msgs.at(-1);
-        const seen = m.seen?.[user.id] || '';
-        return {
-          id: m.id,
-          createdAt: m.createdAt,
-          person: other ? publicProfile(other) : null,
-          last: last ? { text: last.text, mine: last.from === user.id, at: last.at } : null,
-          unread: msgs.filter((x) => x.from !== user.id && x.at > seen).length,
-          isNew: !seen,
-        };
-      })
-      .filter((m) => m.person)
-      .sort((a, b) => (b.last?.at || b.createdAt).localeCompare(a.last?.at || a.createdAt));
-    return { body: { matches: list } };
-  });
-
-  route('GET', '/api/matches/:id', async ({ user, params }) => {
-    const m = getMatch(user, params.id);
-    const other = store.data.users[m.users.find((u) => u !== user.id)];
-    m.seen = { ...m.seen, [user.id]: now().toISOString() };
-    return {
-      body: {
-        id: m.id,
-        person: other ? publicProfile(other) : null,
-        messages: (store.data.messages[m.id] || []).map((x) => ({ text: x.text, at: x.at, mine: x.from === user.id })),
-      },
-    };
-  });
-
-  route('POST', '/api/matches/:id', async ({ user, params, body }) => {
-    const m = getMatch(user, params.id);
-    const text = cleanText(body.text, 1000);
-    if (!text) throw new HttpError(400, 'Say something first.');
-    const msg = { from: user.id, text, at: now().toISOString() };
-    store.data.messages[m.id].push(msg);
-    m.seen = { ...m.seen, [user.id]: msg.at };
-    const other = store.data.users[m.users.find((u) => u !== user.id)];
-    if (other?.demo) {
-      const at = new Date(Date.parse(msg.at) + 1).toISOString();
-      store.data.messages[m.id].push({ from: other.id, text: demoReply(other, user, store.data.messages[m.id]), at });
-      m.seen[user.id] = at; // shown in the open thread, so not unread
-    }
-    const last = store.data.messages[m.id].at(-1);
-    const reply = last.from !== user.id ? { text: last.text, at: last.at, mine: false } : null;
-    return { status: 201, body: { message: { text, at: msg.at, mine: true }, reply } };
-  });
-
-  route('POST', '/api/matches/:id/unmatch', async ({ user, params, body }) => {
-    const m = getMatch(user, params.id);
-    if (body.report) store.data.reports.push({ by: user.id, about: m.users.find((u) => u !== user.id), reason: cleanText(body.reason, 500), at: now().toISOString() });
-    store.data.blocks[`${user.id}>${m.users.find((u) => u !== user.id)}`] = now().toISOString();
-    delete store.data.matches[m.id];
-    delete store.data.messages[m.id];
-    return { body: { ok: true } };
-  });
-
-  route('GET', '/api/health', async () => ({ body: { ok: true, engine: pickEngine().name } }), { auth: false });
+  for (const register of [account, chat, profile, week, matches, notifications, admin]) register(ctx);
+  route('GET', '/api/health', async () => ({ body: { ok: true, version: VERSION, engine: pickEngine().name, uptime: Math.round(process.uptime()) } }), { auth: false });
 
   function serveStatic(req, res) {
     const url = new URL(req.url, 'http://x');
@@ -395,23 +135,24 @@ export function createApp(store, { secureCookies = false, limits = LIMITS } = {}
       'Content-Type': MIME[path.extname(file)] || 'application/octet-stream',
       'Cache-Control': 'no-cache',
       'X-Content-Type-Options': 'nosniff',
-      'Content-Security-Policy': "default-src 'self'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'",
+      'Referrer-Policy': 'same-origin',
+      'Content-Security-Policy': "default-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'",
     });
     fs.createReadStream(file).pipe(res);
   }
 
-  return async function handle(req, res) {
+  async function handle(req, res) {
+    const started = Date.now();
     const url = new URL(req.url, 'http://x');
+    if (log) res.on('finish', () => console.log(`${req.method} ${url.pathname.replace(/\/(u|n|it)_[\w-]+|\/[\w-]{16,}(\.\w+)?/g, '/:id')} ${res.statusCode} ${Date.now() - started}ms`));
     if (!url.pathname.startsWith('/api/')) {
       if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, { error: 'Method not allowed.' });
       return serveStatic(req, res);
     }
     try {
-      const r = routes.find((x) => x.method === req.method && x.re.test(url.pathname));
-      if (!r) throw new HttpError(404, 'Not found.');
-      const params = {};
-      const m = url.pathname.match(r.re);
-      r.keys.forEach((k, i) => (params[k] = m[i + 1]));
+      const found = match(req.method, url.pathname);
+      if (!found) throw new HttpError(404, 'Not found.');
+      const { r, params } = found;
       const mutating = req.method !== 'GET' && req.method !== 'HEAD';
       // Browsers cannot send JSON cross-site without a CORS preflight, which we never grant.
       if (mutating && !String(req.headers['content-type'] || '').startsWith('application/json')) {
@@ -419,22 +160,29 @@ export function createApp(store, { secureCookies = false, limits = LIMITS } = {}
       }
       if (mutating) {
         const ip = req.socket.remoteAddress;
-        const bucket = /^\/api\/(signup|login)$/.test(url.pathname) ? 'auth' : url.pathname === '/api/chat' ? 'chat' : 'write';
+        const bucket = /^\/api\/(signup|login|password\/\w+)$/.test(url.pathname) ? 'auth' : url.pathname === '/api/chat' ? 'chat' : 'write';
         if (!allow(`${ip}:${bucket}`, limits[bucket])) throw new HttpError(429, 'Slow down a little and try again in a minute.');
       }
       const token = parseCookies(req.headers.cookie).sid;
       const session = token && store.data.sessions[token];
       let user = null;
       if (session && session.expires > Date.now()) user = store.data.users[session.userId] || null;
+      if (user?.suspended) user = null;
       if (r.auth && !user) throw new HttpError(401, 'Please sign in.');
-      const body = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) ? await readBody(req) : {};
-      const out = await r.handler({ req, user, token, params, body: body && typeof body === 'object' ? body : {} });
+      if (r.admin && !isAdmin(user)) throw new HttpError(403, 'Only for moderators.');
+      const body = mutating ? await readBody(req, r.bodyLimit) : {};
+      const out = await r.handler({ req, res, user, token, params, query: url.searchParams, body: body && typeof body === 'object' ? body : {} });
       store.save();
+      if (out?.handled) return; // the route wrote its own response (streams, files)
       send(res, out.status || 200, out.body, out.headers);
     } catch (err) {
       const status = err.status || 500;
       if (status === 500) console.error(err);
-      send(res, status, { error: status === 500 ? 'Something went wrong.' : err.message });
+      if (!res.headersSent) send(res, status, { error: status === 500 ? 'Something went wrong.' : err.message });
     }
-  };
+  }
+
+  handle.ctx = ctx;
+  handle.hub = hub;
+  return handle;
 }

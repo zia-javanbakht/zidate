@@ -2,17 +2,30 @@ import http from 'node:http';
 import { Store } from '../src/db.js';
 import { createApp } from '../src/app.js';
 import { seedDemo } from '../src/seed.js';
+import { createMailer } from '../src/mailer.js';
 
 process.env.ZIDATE_AGENT = 'offline';
 
 // Start the app on a random port with an in-memory store.
-export async function startServer({ seed = true, limits = { auth: 1000, chat: 1000, write: 1000 } } = {}) {
+export async function startServer({ seed = true, limits = { auth: 1000, chat: 1000, write: 1000 }, admins = ['admin@x.co'] } = {}) {
   const store = new Store(null);
   if (seed) seedDemo(store);
-  const server = http.createServer(createApp(store, { limits }));
+  const mailer = createMailer();
+  const handler = createApp(store, { limits, admins, mailer, baseUrl: 'http://zidate.test' });
+  const server = http.createServer(handler);
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  server.unref(); // a failed test that never closes its server must not hang the run
   const base = `http://127.0.0.1:${server.address().port}`;
-  return { store, server, base, close: () => new Promise((r) => server.close(r)) };
+  return {
+    store, server, base, mailer, ctx: handler.ctx, hub: handler.hub,
+    close: () => { handler.hub.closeAll(); server.closeAllConnections?.(); return new Promise((r) => server.close(r)); },
+  };
+}
+
+// The token from the newest email to this address, from a link like /#/verify/TOKEN.
+export function linkToken(mailer, to, kind) {
+  const mail = [...mailer.sent].reverse().find((m) => m.to === to && m.text.includes(`#/${kind}/`));
+  return mail?.text.match(new RegExp(`#/${kind}/([\\w-]+)`))?.[1];
 }
 
 // A tiny cookie-keeping client.

@@ -1,7 +1,8 @@
 // Weekly suggestions: exactly two people per week, picked from hidden profiles.
 import { TRAIT_KEYS, TOPICS } from './traits.js';
 import { basicsDone } from './profile.js';
-import { isReady, publicProfile } from './profile.js';
+import { isReady, publicProfile, settingsOf } from './profile.js';
+import { normalizeCity } from './cities.js';
 import { weekKey, nextWeekStart, now } from './clock.js';
 
 export const PER_WEEK = 2;
@@ -27,7 +28,12 @@ function ageOk(a, b) {
 }
 
 function sameCity(a, b) {
-  return String(a.basics.city || '').toLowerCase() === String(b.basics.city || '').toLowerCase();
+  return normalizeCity(a.basics.city) === normalizeCity(b.basics.city);
+}
+
+// Out of the pool: paused, suspended, or stopped (e.g. under 18).
+export function inactive(u) {
+  return Boolean(u.blocked || u.suspended || settingsOf(u).paused);
 }
 
 function kidsConflict(a, b) {
@@ -42,7 +48,7 @@ function dealbreaker(a, b) {
 
 // Can these two be suggested to each other at all? Symmetric.
 export function eligible(a, b) {
-  if (a.id === b.id || a.blocked || b.blocked) return false;
+  if (a.id === b.id || inactive(a) || inactive(b)) return false;
   if (!wants(a, b) || !wants(b, a)) return false;
   if (!ageOk(a, b)) return false;
   if (kidsConflict(a, b)) return false;
@@ -117,6 +123,7 @@ export function weeklyPicks(store, user) {
   const key = `${user.id}:${wk}`;
   let week = store.data.weeks[key];
   if (!week) {
+    if (settingsOf(user).paused) return { week: wk, ready: isReady(user), paused: true, picks: [], next: nextWeekStart().toISOString() };
     if (!isReady(user)) {
       // Tell the person what is still missing, in plain words.
       const missing = basicsDone(user)
@@ -144,11 +151,30 @@ export function weeklyPicks(store, user) {
       .map((p) => {
         const other = store.data.users[p.id];
         const matched = Boolean(store.data.matches[matchId(user.id, other.id)]);
-        return { ...publicProfile(other), reason: reason(user, other), decision: p.decision, matchId: matched ? matchId(user.id, other.id) : null };
+        const showPhotos = matched || !settingsOf(other).photosAfterMatch;
+        return { ...publicProfile(other, { showPhotos }), reason: reason(user, other), decision: p.decision, matchId: matched ? matchId(user.id, other.id) : null };
       }),
+    // Offer to widen the search when this week came up short.
+    widen: week.picks.length < PER_WEEK && (user.basics.ageRange ?? DEFAULT_AGE_RANGE) < 15,
   };
 }
 
 export function matchId(a, b) {
   return [a, b].sort().join('~');
+}
+
+// Make sure every active person has this week's picks, and tell them once.
+export function runWeekly(store, notify) {
+  let made = 0;
+  for (const u of Object.values(store.data.users)) {
+    if (u.demo || inactive(u) || !isReady(u)) continue;
+    const key = `${u.id}:${weekKey()}`;
+    if (store.data.weeks[key]) continue;
+    const res = weeklyPicks(store, u);
+    if (res.picks.length) {
+      made++;
+      notify?.(u, { type: 'picks', text: 'Your two people for this week are here.', link: '#/week' });
+    }
+  }
+  return made;
 }
