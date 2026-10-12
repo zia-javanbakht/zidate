@@ -327,7 +327,7 @@ async function profile() {
   setMe(data.me);
   const { shared, hidden, preview } = data;
 
-  const items = shared.items.filter((i) => i.status !== 'hidden' || true);
+  const items = shared.items;
   const itemNodes = items.map((it) => {
     const text = h('p', { class: 'text' }, it.text);
     const state = h('span', { class: `state ${it.status}` }, it.status === 'approved' ? 'Visible to matches' : it.status === 'hidden' ? 'Hidden' : 'Suggested by your matchmaker');
@@ -375,7 +375,7 @@ async function profile() {
           toast('Got it. I will ask you about that next.');
           location.hash = '#/talk';
         } }, 'Not me') : null)),
-    h('div', { class: `bar ${t.confidence < 0.15 ? 'unsure' : ''}`, 'aria-hidden': 'true' }, h('i', { style: `left:${t.value * 100}%` }))));
+    h('div', { class: `bar ${t.confidence < 0.15 ? 'unsure' : ''}`, 'aria-hidden': 'true' }, h('i', { style: `left:${t.value * 100}%;opacity:${(0.35 + t.confidence).toFixed(2)}` }))));
 
   const signOut = h('button', { class: 'btn ghost', onclick: async () => { await api('POST', '/api/logout'); me = null; location.hash = '#/welcome'; } }, 'Sign out');
   const del = h('button', { class: 'link danger', onclick: async () => {
@@ -391,6 +391,13 @@ async function profile() {
     h('section', { class: 'card stack' },
       h('div', { class: 'section-head' }, h('h2', {}, 'Shared profile'), h('span', { class: 'small muted' }, 'What matches see')),
       h('p', { class: 'small muted' }, 'Your matchmaker suggests lines from your answers. Nothing appears here until you approve it.'),
+      items.filter((i) => i.status === 'suggested').length >= 2
+        ? h('div', {}, h('button', { class: 'btn small', onclick: async () => {
+          const { approved } = await api('POST', '/api/profile/items/approve-all');
+          toast(`${approved} lines are now on your profile.`);
+          profile();
+        } }, `Show all ${items.filter((i) => i.status === 'suggested').length} suggestions`))
+        : null,
       bioBlock,
       ...itemNodes,
       shared.interests.length
@@ -404,8 +411,8 @@ async function profile() {
       h('div', { class: 'section-head' }, h('h2', {}, 'Hidden profile'), h('span', { class: 'small muted' }, 'Only used for matching')),
       h('p', { class: 'small muted' }, 'No one else ever sees this. It is how I choose your two people, and it changes as we talk and as you react to suggestions.'),
       h('div', {}, traits),
-      hidden.tags.length ? h('div', {}, h('div', { class: 'prompt small muted' }, 'Noted'), h('ul', { class: 'tags' }, hidden.tags.map((t) => h('li', {}, t)))) : null,
-      hidden.dealbreakers.length ? h('div', {}, h('div', { class: 'prompt small muted' }, 'Dealbreakers'), h('ul', { class: 'tags' }, hidden.dealbreakers.map((t) => h('li', {}, t)))) : null,
+      hidden.tags.length ? h('div', {}, h('div', { class: 'prompt small muted' }, 'Noted'), h('ul', { class: 'tags' }, hidden.tags.map((t) => h('li', {}, t.replace(/-/g, ' '))))) : null,
+      hidden.dealbreakers.length ? h('div', {}, h('div', { class: 'prompt small muted' }, 'Dealbreakers'), h('ul', { class: 'tags' }, hidden.dealbreakers.map((t) => h('li', {}, t.replace(/-/g, ' '))))) : null,
       hidden.notes.length ? h('div', {}, h('div', { class: 'prompt small muted' }, 'Notes'), h('ul', { class: 'notes' }, hidden.notes.map((n) => h('li', {}, n)))) : null),
     h('div', { class: 'row', style: 'display:flex;justify-content:space-between;align-items:center' }, signOut, del)));
 }

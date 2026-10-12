@@ -221,6 +221,12 @@ export function createApp(store, { secureCookies = false, limits = LIMITS } = {}
     },
   }));
 
+  route('POST', '/api/profile/items/approve-all', async ({ user }) => {
+    let n = 0;
+    for (const i of user.shared.items) if (i.status === 'suggested') (i.status = 'approved'), n++;
+    return { body: { approved: n } };
+  });
+
   route('PATCH', '/api/profile/items/:id', async ({ user, params, body }) => {
     const item = user.shared.items.find((i) => i.id === params.id);
     if (!item) throw new HttpError(404, 'Not found.');

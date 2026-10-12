@@ -212,3 +212,11 @@ test('"Not me" on a trait makes the interviewer ask about it directly', async ()
   assert.ok(u.hidden.traits.social.value < 0.3);
   assert.equal((await c.post('/api/profile/traits/nope/recheck')).status, 404);
 });
+
+test('approve all suggestions at once', async () => {
+  const c = client(srv.base);
+  await onboard(c);
+  const n = (await c.get('/api/profile')).data.shared.items.length;
+  assert.equal((await c.post('/api/profile/items/approve-all')).data.approved, n);
+  assert.equal((await c.get('/api/profile')).data.preview.items.length, n);
+});

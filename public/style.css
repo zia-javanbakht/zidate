@@ -154,7 +154,8 @@ label { display: block; font-size: .875rem; color: var(--muted); margin-bottom: 
 .back { text-decoration: none; color: var(--muted); font-size: .9rem; }
 
 /* Profile */
-.section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.section-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; }
+.section-head h2 { white-space: nowrap; }
 .item { border-top: 1px solid var(--line); padding: 14px 0; }
 .item .prompt { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .item .text { margin: 4px 0 10px; }
