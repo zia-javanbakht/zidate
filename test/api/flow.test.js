@@ -45,8 +45,9 @@ test('the chat mentions when matching unlocks, once', async () => {
   const c = client(srv.base);
   await onboard(c);
   const { data } = await c.get('/api/chat');
-  const hits = data.messages.filter((m) => m.role === 'agent' && m.text.includes('first two people'));
+  const hits = data.messages.filter((m) => m.notice === 'ready');
   assert.equal(hits.length, 1);
+  assert.ok(data.messages.at(-1).qid, 'the conversation continues after the notice');
 });
 
 test('approving a suggestion makes it public; editing works', async () => {

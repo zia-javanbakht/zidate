@@ -207,8 +207,9 @@ export function createApp(store, { secureCookies = false, limits = LIMITS } = {}
     if (user.blocked) throw new HttpError(403, 'This account cannot continue.');
     const convo = store.data.conversations[user.id];
     opening(user, convo);
+    const start = convo.messages.length + 1; // after the person's own message
     const message = await respond(user, convo, body.text);
-    return { body: { message, me: meView(user, store) } };
+    return { body: { message, messages: convo.messages.slice(start), me: meView(user, store) } };
   });
 
   // --- profiles ---

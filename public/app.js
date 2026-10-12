@@ -134,7 +134,13 @@ async function talk() {
   const sendBtn = h('button', { class: 'btn', type: 'submit', 'aria-label': 'Send' }, 'Send');
   const form = h('form', { class: 'composer' }, input, sendBtn);
 
-  const add = (m) => log.append(h('p', { class: `msg ${m.role}` }, m.text));
+  const add = (m) => {
+    if (m.notice === 'ready') {
+      log.append(h('div', { class: 'notice' }, h('p', {}, m.text), h('a', { class: 'btn accent small', href: '#/week' }, 'Meet this week’s two')));
+      return;
+    }
+    log.append(h('p', { class: `msg ${m.role}` }, m.text));
+  };
   messages.forEach(add);
 
   function showChips(m) {
@@ -159,9 +165,9 @@ async function talk() {
     log.append(typing);
     scroll();
     try {
-      const { message, me: u } = await api('POST', '/api/chat', { text });
+      const { message, messages: fresh, me: u } = await api('POST', '/api/chat', { text });
       typing.remove();
-      add(message);
+      (fresh || [message]).forEach(add);
       showChips(message);
       setMe(u);
       bar.replaceChildren(progress(u.completeness));

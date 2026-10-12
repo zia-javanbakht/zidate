@@ -105,7 +105,7 @@ export function opening(user, convo) {
   return say(convo, `Hi ${user.name}. I'm your matchmaker here. Instead of swiping, we talk, and each week I introduce you to two people. ${q.text}`, q);
 }
 
-const READY_LINE = "I know enough now to find your first two people. They are waiting under This week. We can keep talking whenever you like; the more I know, the better the picks.";
+const READY_LINE = 'I know enough to introduce you to your first two people. We can keep talking whenever you like: the more I know, the better the picks.';
 
 // Handle one message from the person. Returns the agent's reply message.
 export async function respond(user, convo, rawText, engine = pickEngine()) {
@@ -165,10 +165,11 @@ export async function respond(user, convo, rawText, engine = pickEngine()) {
   }
   user.updatedAt = now().toISOString();
 
-  let reply = result.reply || next.text;
+  const reply = result.reply || next.text;
   if (!wasReady && isReady(user) && !convo.flags.readyAnnounced) {
+    // A milestone gets its own card in the chat, not a sentence buried in a reply.
     convo.flags.readyAnnounced = true;
-    reply = `${reply.replace(next.text, '').trim()} ${READY_LINE} ${next.text}`.replace(/\s+/g, ' ').trim();
+    convo.messages.push({ role: 'agent', notice: 'ready', text: READY_LINE, at: now().toISOString() });
   }
   return say(convo, reply, next);
 }
