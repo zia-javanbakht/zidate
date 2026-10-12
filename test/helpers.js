@@ -6,10 +6,10 @@ import { seedDemo } from '../src/seed.js';
 process.env.ZIDATE_AGENT = 'offline';
 
 // Start the app on a random port with an in-memory store.
-export async function startServer({ seed = true } = {}) {
+export async function startServer({ seed = true, limits = { auth: 1000, chat: 1000, write: 1000 } } = {}) {
   const store = new Store(null);
   if (seed) seedDemo(store);
-  const server = http.createServer(createApp(store));
+  const server = http.createServer(createApp(store, { limits }));
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${server.address().port}`;
   return { store, server, base, close: () => new Promise((r) => server.close(r)) };
@@ -21,8 +21,8 @@ export function client(base) {
   async function call(method, url, body) {
     const res = await fetch(base + url, {
       method,
-      headers: { ...(body ? { 'content-type': 'application/json' } : {}), ...(cookie ? { cookie } : {}) },
-      body: body ? JSON.stringify(body) : undefined,
+      headers: { ...(method !== 'GET' ? { 'content-type': 'application/json' } : {}), ...(cookie ? { cookie } : {}) },
+      body: method !== 'GET' ? JSON.stringify(body ?? {}) : undefined,
     });
     const set = res.headers.get('set-cookie');
     if (set) cookie = set.split(';')[0];

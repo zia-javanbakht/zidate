@@ -111,7 +111,25 @@ function createMatch(store, a, b) {
   return m;
 }
 
-export function createApp(store, { secureCookies = false } = {}) {
+// Fixed-window rate limiter, per client and bucket.
+function limiter() {
+  const hits = new Map();
+  return (key, max, windowMs = 60000) => {
+    const t = Date.now();
+    const h = hits.get(key);
+    if (!h || t - h.start > windowMs) {
+      hits.set(key, { start: t, n: 1 });
+      if (hits.size > 10000) hits.clear();
+      return true;
+    }
+    return ++h.n <= max;
+  };
+}
+
+const LIMITS = { auth: 10, chat: 40, write: 120 };
+
+export function createApp(store, { secureCookies = false, limits = LIMITS } = {}) {
+  const allow = limiter();
   const routes = [];
   const route = (method, pattern, handler, opts = {}) => {
     const keys = [];
@@ -346,6 +364,16 @@ export function createApp(store, { secureCookies = false } = {}) {
       const params = {};
       const m = url.pathname.match(r.re);
       r.keys.forEach((k, i) => (params[k] = m[i + 1]));
+      const mutating = req.method !== 'GET' && req.method !== 'HEAD';
+      // Browsers cannot send JSON cross-site without a CORS preflight, which we never grant.
+      if (mutating && !String(req.headers['content-type'] || '').startsWith('application/json')) {
+        throw new HttpError(415, 'Send JSON.');
+      }
+      if (mutating) {
+        const ip = req.socket.remoteAddress;
+        const bucket = /^\/api\/(signup|login)$/.test(url.pathname) ? 'auth' : url.pathname === '/api/chat' ? 'chat' : 'write';
+        if (!allow(`${ip}:${bucket}`, limits[bucket])) throw new HttpError(429, 'Slow down a little and try again in a minute.');
+      }
       const token = parseCookies(req.headers.cookie).sid;
       const session = token && store.data.sessions[token];
       let user = null;

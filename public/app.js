@@ -24,8 +24,8 @@ function h(tag, attrs = {}, ...children) {
 async function api(method, url, body) {
   const res = await fetch(url, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
+    headers: method === 'GET' ? {} : { 'Content-Type': 'application/json' },
+    body: method === 'GET' ? undefined : JSON.stringify(body || {}),
     credentials: 'same-origin',
   });
   const data = await res.json().catch(() => ({}));
