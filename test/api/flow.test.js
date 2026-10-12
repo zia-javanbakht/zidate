@@ -221,3 +221,17 @@ test('approve all suggestions at once', async () => {
   assert.equal((await c.post('/api/profile/items/approve-all')).data.approved, n);
   assert.equal((await c.get('/api/profile')).data.preview.items.length, n);
 });
+
+test('demo people are labelled and reply, so a solo tester can try messaging', async () => {
+  const c = client(srv.base);
+  const { me } = await onboard(c);
+  const { data } = await c.get('/api/week');
+  assert.ok(data.picks.every((p) => p.demo === true));
+  srv.store.data.likes[`${data.picks[0].id}>${me.id}`] = new Date().toISOString();
+  const { match } = (await c.post(`/api/week/${data.picks[0].id}`, { decision: 'like' })).data;
+  const r = await c.post(`/api/matches/${encodeURIComponent(match.id)}`, { text: 'Hey!' });
+  assert.match(r.data.reply.text, /Nice to match/);
+  const thread = (await c.get(`/api/matches/${encodeURIComponent(match.id)}`)).data;
+  assert.equal(thread.messages.length, 2);
+  assert.equal((await c.get('/api/me')).data.user.unread, 0);
+});

@@ -153,5 +153,6 @@ export function publicProfile(user) {
     bio: user.shared.bio || '',
     interests: user.shared.interests,
     items: user.shared.items.filter((i) => i.status === 'approved').map(({ prompt, text }) => ({ prompt, text })),
+    ...(user.demo ? { demo: true } : {}),
   };
 }

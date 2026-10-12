@@ -101,6 +101,19 @@ function learnFromLike(user, other) {
   }
 }
 
+// Demo people answer so a solo tester can try the whole flow. Clearly labelled as demo.
+function demoReply(demo, user, thread) {
+  const mine = thread.filter((x) => x.from === demo.id).length;
+  const interest = demo.shared.interests.find((i) => user.shared.interests.includes(i)) || demo.shared.interests[0];
+  const lines = [
+    `Hi ${user.name}! Nice to match. I saw you are in ${user.basics.city}, how are you finding it?`,
+    `Ha, fair. I have been really into ${interest} lately. Are you?`,
+    'What does a good week look like for you?',
+    'I like that. Coffee sometime? (I am a demo profile, so this is where the demo ends.)',
+  ];
+  return lines[Math.min(mine, lines.length - 1)];
+}
+
 function createMatch(store, a, b) {
   const id = matchId(a.id, b.id);
   if (store.data.matches[id]) return store.data.matches[id];
@@ -351,7 +364,15 @@ export function createApp(store, { secureCookies = false, limits = LIMITS } = {}
     const msg = { from: user.id, text, at: now().toISOString() };
     store.data.messages[m.id].push(msg);
     m.seen = { ...m.seen, [user.id]: msg.at };
-    return { status: 201, body: { message: { text, at: msg.at, mine: true } } };
+    const other = store.data.users[m.users.find((u) => u !== user.id)];
+    if (other?.demo) {
+      const at = new Date(Date.parse(msg.at) + 1).toISOString();
+      store.data.messages[m.id].push({ from: other.id, text: demoReply(other, user, store.data.messages[m.id]), at });
+      m.seen[user.id] = at; // shown in the open thread, so not unread
+    }
+    const last = store.data.messages[m.id].at(-1);
+    const reply = last.from !== user.id ? { text: last.text, at: last.at, mine: false } : null;
+    return { status: 201, body: { message: { text, at: msg.at, mine: true }, reply } };
   });
 
   route('POST', '/api/matches/:id/unmatch', async ({ user, params, body }) => {

@@ -209,7 +209,7 @@ async function talk() {
 function personCard(p, { onDecide } = {}) {
   const card = h('article', { class: 'card person' },
     h('h2', {}, p.name),
-    h('p', { class: 'meta' }, [p.age, p.city].filter(Boolean).join(' · ')),
+    h('p', { class: 'meta' }, [p.age, p.city, p.demo ? 'demo profile' : null].filter(Boolean).join(' · ')),
     p.bio ? h('p', { class: 'bio' }, p.bio) : null,
     p.reason ? h('p', { class: 'why' }, p.reason) : null,
     p.interests?.length ? h('ul', { class: 'tags', 'aria-label': 'Interests' }, p.interests.map((i) => h('li', {}, i))) : null,
@@ -302,8 +302,9 @@ async function matchThread(id) {
     if (!text) return;
     input.value = '';
     try {
-      const { message } = await api('POST', `/api/matches/${encodeURIComponent(id)}`, { text });
+      const { message, reply } = await api('POST', `/api/matches/${encodeURIComponent(id)}`, { text });
       add(message);
+      if (reply) setTimeout(() => add(reply), 900);
     } catch (ex) {
       toast(ex.message);
       input.value = text;
