@@ -22,7 +22,18 @@ const traitUpdate = {
 export const SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['reply', 'traitUpdates', 'preferenceUpdates', 'tags', 'dealbreakers', 'interests', 'values', 'sharedSuggestions', 'privateNote', 'bio'],
+  required: [
+    'reply',
+    'traitUpdates',
+    'preferenceUpdates',
+    'tags',
+    'dealbreakers',
+    'interests',
+    'values',
+    'sharedSuggestions',
+    'privateNote',
+    'bio',
+  ],
   properties: {
     reply: { type: 'string', description: 'A brief, warm acknowledgement (max one sentence) followed by the next question.' },
     traitUpdates: { type: 'array', items: traitUpdate, description: 'What the answer says about the person themselves.' },
@@ -62,14 +73,13 @@ Rules:
 - reply: at most one short sentence reacting to what they said (specific, not gushing), then the next question. Keep the meaning of the next question; if it lists quick-reply options, do not list them in text. No emoji. Plain, warm, minimal.
 - If the answer is off-topic, hostile, or unsafe, do not extract anything and gently steer back.`;
 
-let client;
-function getClient() {
-  client ||= new Anthropic();
-  return client;
-}
+let defaultClient;
 
 export function buildUserMessage({ user, convo, pending, answer, choiceApplied, next }) {
-  const recent = convo.messages.slice(-12).map((m) => `${m.role === 'agent' ? 'Interviewer' : 'Person'}: ${m.text}`).join('\n');
+  const recent = convo.messages
+    .slice(-12)
+    .map((m) => `${m.role === 'agent' ? 'Interviewer' : 'Person'}: ${m.text}`)
+    .join('\n');
   return [
     `Person: ${user.name}, ${user.basics.age ?? '?'} , ${user.basics.city ?? '?'}`,
     `Current hidden profile (for your reasoning only): ${JSON.stringify(describeHidden(user))}`,
@@ -79,28 +89,36 @@ export function buildUserMessage({ user, convo, pending, answer, choiceApplied, 
     choiceApplied ? 'They tapped a quick reply; that is already recorded, so traitUpdates can stay empty unless they added more.' : '',
     `Their answer: """${answer}"""`,
     `Next question to ask: ${next?.text || 'Invite them to tell you anything else that matters to them.'}`,
-  ].filter(Boolean).join('\n\n');
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
-export const claudeEngine = {
-  name: 'claude',
-  async turn(ctx) {
-    const res = await getClient().beta.messages.create({
-      model: MODEL,
-      max_tokens: 2000,
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-      system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
-      output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
-      messages: [{ role: 'user', content: buildUserMessage(ctx) }],
-    });
-    if (res.stop_reason === 'refusal') throw new Error('refusal');
-    const text = res.content.find((b) => b.type === 'text')?.text;
-    const parsed = JSON.parse(text);
-    const { reply, bio, privateNote, ...update } = parsed;
-    if (bio) update.bio = bio;
-    if (privateNote) update.privateNote = privateNote;
-    update.sharedSuggestions = (update.sharedSuggestions || []).slice(0, 1);
-    return { update, reply };
-  },
-};
+// The client is injectable so tests can exercise parsing without the network.
+export function makeClaudeEngine(getClient = () => (defaultClient ||= new Anthropic())) {
+  return {
+    name: 'claude',
+    async turn(ctx) {
+      const res = await getClient().beta.messages.create({
+        model: MODEL,
+        max_tokens: 2000,
+        betas: ['server-side-fallback-2026-07-01'],
+        fallbacks: 'default',
+        system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
+        output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
+        messages: [{ role: 'user', content: buildUserMessage(ctx) }],
+      });
+      if (res.stop_reason === 'refusal') throw new Error('refusal');
+      const text = res.content.find((b) => b.type === 'text')?.text;
+      const parsed = JSON.parse(text);
+      const { reply, bio, privateNote, ...update } = parsed;
+      if (bio) update.bio = bio;
+      if (privateNote) update.privateNote = privateNote;
+      update.sharedSuggestions = (update.sharedSuggestions || []).slice(0, 1);
+      if (typeof reply !== 'string' || !reply.trim()) throw new Error('empty reply');
+      return { update, reply };
+    },
+  };
+}
+
+export const claudeEngine = makeClaudeEngine();
