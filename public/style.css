@@ -323,3 +323,40 @@ input[type=number] { width: 100%; padding: 11px 12px; border: 1px solid var(--li
 .guide .todo { margin: 0; padding-left: 18px; color: var(--muted); font-size: .9rem; }
 .guide .todo .link { text-align: left; }
 .nudge { margin: 0; padding: 8px 12px; border-radius: 10px; border-left: 3px solid var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+
+/* Likes on one part of a profile (round 4) */
+.qa dd { display: flex; gap: 8px; align-items: flex-start; justify-content: space-between; }
+.heart { flex: none; border: 1px solid var(--line); background: transparent; color: var(--accent); border-radius: 50%; width: 32px; height: 32px; cursor: pointer; font-size: 1rem; line-height: 1; }
+.heart:hover:not(:disabled) { background: var(--accent); color: #fff; }
+.heart:disabled { opacity: .4; cursor: default; }
+.like-photo { margin: -6px 0 10px; }
+blockquote.about { margin: 6px 0; padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--line); border-radius: 0 10px 10px 0; display: flex; flex-direction: column; gap: 2px; }
+blockquote.about .prompt { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+blockquote.about img { width: 120px; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 8px; }
+.liked-you { margin: -4px 0 14px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--accent); }
+.liked-you .note { margin-top: 6px; font-family: var(--serif); font-size: 1.05rem; }
+.log .liked { max-width: 85%; }
+.log .liked.user { align-self: flex-end; text-align: right; }
+.log .liked blockquote { text-align: left; }
+.turn { color: var(--accent); font-weight: 600; white-space: nowrap; }
+.closed-note { margin: 4px 0 8px; }
+.banner.plan { flex-wrap: wrap; }
+.ideas { margin: 6px 0; font-size: .9rem; }
+.ideas summary { cursor: pointer; color: var(--accent); }
+.ideas ul { margin: 6px 0 0; padding-left: 18px; }
+.ideas .link { text-align: left; }
+.openers { margin-top: 14px; }
+.openers .prompt { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.openers ul, ul.plain { margin: 4px 0 0; padding-left: 18px; }
+/* Photo verification */
+.verified { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; margin-left: 10px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); font-family: var(--sans); font-size: .75rem; font-weight: 600; letter-spacing: .02em; }
+.verified::before { content: "✓"; }
+.section-head .verified { margin-left: 0; }
+.verify .pose { display: grid; gap: 2px; }
+.verify .pose strong { font-size: 1.15rem; }
+.selfie-live, .selfie-shot { width: 100%; max-width: 300px; aspect-ratio: 3 / 4; object-fit: cover; border-radius: var(--radius); background: var(--line); }
+.selfie-live { transform: scaleX(-1); }
+.verify-compare { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+.verify-compare figure { margin: 0; display: grid; gap: 4px; }
+.verify-compare img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 8px; background: var(--line); }
+.verify-compare figure:first-child img { outline: 2px solid var(--accent); }

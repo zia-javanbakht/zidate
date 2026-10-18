@@ -5,7 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 
 function blank() {
-  return { users: {}, sessions: {}, conversations: {}, weeks: {}, likes: {}, passes: {}, blocks: {}, matches: {}, messages: {}, reports: [], notifications: {}, tokens: {}, signals: {}, suggested: {} };
+  return { users: {}, sessions: {}, conversations: {}, weeks: {}, likes: {}, passes: {}, blocks: {}, matches: {}, messages: {}, reports: [], notifications: {}, tokens: {}, signals: {}, suggested: {}, likeNotes: {}, dates: {} };
 }
 
 export class Store {

@@ -7,11 +7,11 @@ import { createMailer } from '../src/mailer.js';
 process.env.PISHI_AGENT = 'offline';
 
 // Start the app on a random port with an in-memory store.
-export async function startServer({ seed = true, limits = { auth: 1000, chat: 1000, write: 1000 }, admins = ['admin@x.co'] } = {}) {
+export async function startServer({ seed = true, limits = { auth: 1000, chat: 1000, write: 1000 }, admins = ['admin@x.co'], vision = null } = {}) {
   const store = new Store(null);
   if (seed) seedDemo(store);
   const mailer = createMailer();
-  const handler = createApp(store, { limits, admins, mailer, baseUrl: 'http://pishi.test' });
+  const handler = createApp(store, { limits, admins, mailer, vision, baseUrl: 'http://pishi.test' });
   const server = http.createServer(handler);
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   server.unref(); // a failed test that never closes its server must not hang the run

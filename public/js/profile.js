@@ -1,9 +1,10 @@
 // "You": photos, the shared profile (with approvals), a preview, and the hidden profile.
 import { h, api, render, setMe, state, toast, progress, ask, cap, pretty } from './core.js';
 import { personCard } from './people.js';
+import { verifyBlock } from './verify.js';
 
 // Shrink a picked image in the browser so uploads stay small (and drop camera metadata).
-async function toDataUrl(file, max = 1280) {
+export async function toDataUrl(file, max = 1280) {
   const url = URL.createObjectURL(file);
   try {
     const img = new Image();
@@ -70,11 +71,14 @@ export async function profile(section = '') {
     const edit = act(async () => {
       const v = await ask({ title: 'Edit this line', text: it.prompt || 'About me', fields: [{ name: 'text', label: 'Text', type: 'textarea', value: it.text, maxlength: 300 }] });
       if (!v) return;
-      await api('PATCH', `/api/profile/items/${it.id}`, { text: v.text });
+      const { feedback } = await api('PATCH', `/api/profile/items/${it.id}`, { text: v.text });
+      if (feedback) toast(`${feedback.label}. ${feedback.tip}`);
       reload();
     });
+    const fb = data.feedback?.[it.id];
     return h('div', { class: 'item' },
       h('div', { class: 'prompt' }, it.prompt || 'About me'), h('p', { class: 'text' }, it.text),
+      fb && fb.level !== 'great' ? h('p', { class: 'nudge small' }, h('strong', {}, `${fb.label}. `), fb.tip) : null,
       h('div', { class: 'row' }, state_,
         it.status !== 'approved' ? h('button', { class: 'btn small', onclick: setStatus('approved') }, 'Show on profile') : h('button', { class: 'btn small ghost', onclick: setStatus('hidden') }, 'Hide'),
         h('button', { class: 'btn small ghost', onclick: edit }, 'Edit'),
@@ -110,10 +114,34 @@ export async function profile(section = '') {
       validate: (x) => (x.text.trim() ? '' : 'Write a few words first.'),
     });
     if (!v) return;
-    await api('POST', '/api/profile/items', v);
-    toast('Added to your profile.');
+    const { feedback } = await api('POST', '/api/profile/items', v);
+    toast(feedback.level === 'great' ? 'Added. Great answer: specific and easy to reply to.' : `Added. ${feedback.label}: ${feedback.tip}`);
     reload();
   });
+
+  // --- opening questions ---
+  const openers = shared.openers || [];
+  const saveOpeners = (list) => act(async () => { await api('PUT', '/api/profile/openers', { openers: list }); reload(); });
+  const addOpener = act(async () => {
+    const v = await ask({
+      title: 'Add an opening question',
+      text: 'Matches can answer it to start the conversation.',
+      fields: [
+        { name: 'pick', label: 'Pick one', type: 'select', options: [['', 'Write my own below'], ...data.openers.filter((o) => !openers.includes(o))] },
+        { name: 'own', label: 'Or your own question', maxlength: 120 },
+      ],
+      confirm: 'Add',
+      validate: (x) => (x.pick || x.own.trim() ? '' : 'Pick a question or write one.'),
+    });
+    if (!v) return;
+    await saveOpeners([...openers, v.own.trim() || v.pick])();
+  });
+  const openersBlock = h('div', { class: 'item', id: 'openers' },
+    h('div', { class: 'prompt' }, 'Opening questions'),
+    openers.length
+      ? h('ul', { class: 'plain' }, openers.map((q, i) => h('li', {}, q, ' ', h('button', { class: 'link small', type: 'button', 'aria-label': `Remove: ${q}`, onclick: saveOpeners(openers.filter((_, j) => j !== i)) }, 'Remove'))))
+      : h('p', { class: 'text muted' }, 'Up to three questions a match can answer, so nobody has to think of a first line.'),
+    openers.length < 3 ? h('div', { class: 'row' }, h('button', { class: 'btn small ghost', type: 'button', onclick: addOpener }, '+ Add a question')) : null);
 
   const addInterest = act(async () => {
     const left = data.interests.filter((i) => !shared.interests.includes(i));
@@ -170,6 +198,7 @@ export async function profile(section = '') {
     factsBlock,
     h('div', { id: 'lines', class: 'stack' }, ...itemNodes),
     h('div', { class: 'item' }, h('button', { class: 'btn small ghost', onclick: addLine }, '+ Add a line of my own')),
+    openersBlock,
     h('div', { class: 'item', id: 'interests' }, h('div', { class: 'prompt' }, 'Interests'),
       shared.suggestedInterests?.length ? h('div', { class: 'stack' },
         h('p', { class: 'small muted' }, `You mentioned ${shared.suggestedInterests.join(', ')}. Show ${shared.suggestedInterests.length > 1 ? 'them' : 'it'} on your profile?`),
@@ -230,6 +259,7 @@ export async function profile(section = '') {
     guide.complete ? progress(me.completeness) : guideCard(guide),
     me.settings.paused ? h('div', { class: 'banner' }, h('span', {}, 'You are paused, so no one sees you.'), h('a', { href: '#/settings' }, 'Change')) : null,
     photoBlock,
+    verifyBlock(data.verification, photos.length, reload),
     sharedBlock,
     h('details', { class: 'card' },
       h('summary', {}, 'Preview as a match sees it'),

@@ -24,6 +24,13 @@ function rng(seed) {
   };
 }
 
+// Every fourth demo person in each city lives in the next town over, so "nearby" means something.
+const DEMO_SUBURBS = { London: 'Reading', Berlin: 'Potsdam', 'New York': 'Jersey City', Toronto: 'Mississauga' };
+function demoCity(i) {
+  const city = DEMO_CITIES[i % DEMO_CITIES.length];
+  return Math.floor(i / DEMO_CITIES.length) % 4 === 3 ? DEMO_SUBURBS[city] : city;
+}
+
 export function seedDemo(store, { count = 64, seed = 7 } = {}) {
   if (Object.values(store.data.users).some((u) => u.demo)) return 0;
   const r = rng(seed);
@@ -41,7 +48,9 @@ export function seedDemo(store, { count = 64, seed = 7 } = {}) {
     const seeking = gender === 'nonbinary' ? 'everyone' : s < 0.78 ? (gender === 'woman' ? 'men' : 'women') : s < 0.9 ? (gender === 'woman' ? 'women' : 'men') : 'everyone';
     const user = newUser(store, { name, email: `demo${i}@pishi.local`, password: null });
     user.demo = true;
-    user.basics = { gender, seeking, age: 22 + Math.floor(r() * 24), city: DEMO_CITIES[i % DEMO_CITIES.length] };
+    user.basics = { gender, seeking, age: 22 + Math.floor(r() * 24), city: demoCity(i),
+      // A mix of how far demo people would go; from the index so the random sequence is unchanged.
+      distance: ['any', 'hours', null, 'near', 'any', null][Math.floor(i / DEMO_CITIES.length) % 6] };
     for (const k of CORE_TRAITS) user.hidden.traits[k] = { value: clamp01(Math.round(r() * 100) / 100), confidence: 0.5 + Math.round(r() * 30) / 100 };
     for (const k of TRAIT_KEYS.filter((t) => !CORE_TRAITS.includes(t))) user.hidden.traits[k] = { value: clamp01(Math.round(r2() * 100) / 100), confidence: 0.3 + Math.round(r2() * 30) / 100 };
     for (const k of TEMPERAMENT_KEYS) user.hidden.temperament[k] = { value: Math.round(r3() * 100) / 100, confidence: 0.4 + Math.round(r3() * 30) / 100 };

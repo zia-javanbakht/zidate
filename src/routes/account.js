@@ -4,14 +4,15 @@ import { hashPassword, verifyPassword } from '../auth.js';
 import { cleanText, settingsOf, describeHidden } from '../profile.js';
 import { normalizeCity } from '../cities.js';
 import { now, validTimeZone } from '../clock.js';
-import { currentWeek } from '../matching.js';
+import { currentWeek, SEEKING } from '../matching.js';
 import { signalsOf, summarizeSignals, forget } from '../signals.js';
+import { forgetReviews } from '../dates.js';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TOKEN_TTL = { verify: 7 * 864e5, reset: 3600e3 };
 
 export default function account(ctx) {
-  const { store, route, HttpError, meView, startSession, endSessions, cookie, mailer, baseUrl, photos, newUser } = ctx;
+  const { store, route, HttpError, meView, startSession, endSessions, cookie, mailer, baseUrl, photos, looks, newUser } = ctx;
 
   // Per-account lockout on top of the per-address rate limit, so guessing from many places fails too.
   const fails = new Map();
@@ -148,6 +149,16 @@ export default function account(ctx) {
     if (typeof body.paused === 'boolean') s.paused = body.paused;
     if (typeof body.photosAfterMatch === 'boolean') s.photosAfterMatch = body.photosAfterMatch;
     for (const k of ['picks', 'match', 'message']) if (typeof body.email?.[k] === 'boolean') s.email[k] = body.email[k];
+    // Someone to tell about date plans (Share Date). null removes them.
+    if (body.trustedContact === null) delete s.trustedContact;
+    else if (body.trustedContact !== undefined) {
+      const name = cleanText(body.trustedContact?.name, 40);
+      const email = String(body.trustedContact?.email || '').trim().toLowerCase();
+      if (!name) throw new HttpError(400, 'Who is your trusted contact?');
+      if (!EMAIL_RE.test(email) || email.length > 200) throw new HttpError(400, 'That email does not look right.');
+      if (email === user.email) throw new HttpError(400, 'Pick someone other than yourself.');
+      s.trustedContact = { name, email };
+    }
     // Which day the weekly two arrive, in the person's own time zone.
     const day = body.matchDay === undefined ? s.matchDay : Number(body.matchDay);
     if (!Number.isInteger(day) || day < 0 || day > 6) throw new HttpError(400, 'Pick a day of the week.');
@@ -170,7 +181,7 @@ export default function account(ctx) {
       user.basics.gender = b.gender;
     }
     if (b.seeking !== undefined) {
-      if (!['women', 'men', 'everyone'].includes(b.seeking)) throw new HttpError(400, 'Pick women, men or everyone.');
+      if (!SEEKING[b.seeking]) throw new HttpError(400, 'Pick who you want to meet.');
       user.basics.seeking = b.seeking;
     }
     if (b.age !== undefined) {
@@ -182,6 +193,10 @@ export default function account(ctx) {
       const r = Number(b.ageRange);
       if (![3, 5, 8, 10, 15, 20].includes(r)) throw new HttpError(400, 'Pick one of the age ranges.');
       user.basics.ageRange = r;
+    }
+    if (b.distance !== undefined) {
+      if (!['near', 'hours', 'any'].includes(b.distance)) throw new HttpError(400, 'Pick how far you would go.');
+      user.basics.distance = b.distance;
     }
     if (b.city !== undefined) {
       const city = normalizeCity(cleanText(b.city, 50));
@@ -200,10 +215,14 @@ export default function account(ctx) {
       sharedProfile: user.shared,
       hiddenProfile: { ...describeHidden(user), raw: user.hidden },
       // Kept only for matching and never shown in the app; included here because it is yours.
-      matchingSignals: { summary: summarizeSignals(signalsOf(store, user.id)), raw: signalsOf(store, user.id) },
-      photos: (user.photos || []).map((p) => p.id),
+      // What people who met you said stays theirs: only how many answered is included.
+      matchingSignals: { summary: summarizeSignals(signalsOf(store, user.id)), raw: { ...signalsOf(store, user.id), dateReviews: { count: Object.keys(signalsOf(store, user.id).dateReviews).length } } },
+      photos: (user.photos || []).map((p) => ({ id: p.id, describedAs: store.data.photoLooks?.[p.id]?.tags || null })),
+      photoVerification: user.verification ? { status: user.verification.status, at: user.verification.at, checkedPhotos: user.verification.photoIds } : null,
       conversationWithMatchmaker: store.data.conversations[user.id]?.messages || [],
+      datePlans: Object.values(store.data.dates || {}).filter((d) => d.userId === user.id),
       likes: mine('likes'),
+      notesSentWithLikes: Object.entries(store.data.likeNotes || {}).filter(([k]) => k.split('>')[0] === user.id).map(([k, n]) => ({ person: k.split('>')[1], ...n })),
       passes: mine('passes'),
       matches: Object.values(store.data.matches).filter((m) => m.users.includes(user.id)).map((m) => ({
         with: store.data.users[m.users.find((u) => u !== user.id)]?.name,
@@ -222,16 +241,23 @@ export default function account(ctx) {
 
   route('DELETE', '/api/me', async ({ user }) => {
     const id = user.id;
-    for (const p of user.photos || []) photos.remove(p.id);
+    for (const p of user.photos || []) {
+      photos.remove(p.id);
+      looks.forgetPhoto(p.id);
+    }
+    if (user.verification?.selfieId) photos.remove(user.verification.selfieId);
     delete store.data.users[id];
     delete store.data.conversations[id];
     forget(store, id);
+    forgetReviews(store, id);
+    for (const k of Object.keys(store.data.held || {})) if (k.startsWith(`${id}:`)) delete store.data.held[k];
     delete store.data.suggested?.[id];
     delete store.data.notifications?.[id];
     endSessions(id);
     for (const [t, v] of Object.entries(store.data.tokens || {})) if (v.userId === id) delete store.data.tokens[t];
     for (const k of Object.keys(store.data.weeks)) if (k.startsWith(`${id}:`)) delete store.data.weeks[k];
-    for (const table of [store.data.likes, store.data.passes, store.data.blocks]) {
+    for (const [k, d] of Object.entries(store.data.dates || {})) if (d.userId === id) delete store.data.dates[k];
+    for (const table of [store.data.likes, store.data.passes, store.data.blocks, store.data.likeNotes || {}]) {
       for (const k of Object.keys(table)) if (k.split('>').includes(id)) delete table[k];
     }
     for (const [mid, m] of Object.entries(store.data.matches)) {

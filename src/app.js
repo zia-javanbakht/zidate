@@ -13,6 +13,8 @@ import { createMailer } from './mailer.js';
 import { createPhotoStore } from './photos.js';
 import { now } from './clock.js';
 import { noteActive } from './signals.js';
+import { createLooks, isPlus } from './looks.js';
+import { pickVision } from './agent/vision.js';
 import account from './routes/account.js';
 import chat from './routes/chat.js';
 import profile from './routes/profile.js';
@@ -20,6 +22,9 @@ import week from './routes/week.js';
 import matches from './routes/matches.js';
 import notifications from './routes/notifications.js';
 import admin from './routes/admin.js';
+import verification from './routes/verification.js';
+import { pickChecker } from './verification.js';
+import dates from './routes/dates.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(ROOT, 'public');
@@ -40,9 +45,9 @@ export function newUser(store, { name, email, password }) {
     emailVerified: false,
     password: password ? hashPassword(password) : null,
     createdAt: now().toISOString(),
-    basics: { gender: null, seeking: null, age: null, city: null },
+    basics: { gender: null, seeking: null, age: null, city: null, distance: null },
     hidden: emptyHidden(),
-    shared: { bio: '', bioDraft: '', interests: [], items: [], facts: {} },
+    shared: { bio: '', bioDraft: '', interests: [], items: [], facts: {}, openers: [] },
     photos: [],
   };
   settingsOf(user);
@@ -60,6 +65,8 @@ export function createApp(store, opts = {}) {
     photoDir = null,
     baseUrl = 'http://localhost:3000',
     log = false,
+    vision = pickVision(),
+    selfieChecker = pickChecker,
   } = opts;
   // People stored before the profile gained new parts get them now.
   for (const u of Object.values(store.data.users)) upgradeUser(u);
@@ -68,12 +75,13 @@ export function createApp(store, opts = {}) {
   const { route, match } = router();
   const hub = createHub();
   const photos = createPhotoStore(photoDir);
+  const looks = createLooks({ store, photos, vision });
 
   const cookie = (token, maxAge) => `sid=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secureCookies ? '; Secure' : ''}`;
   const isAdmin = (user) => Boolean(user && admins.includes(user.email));
 
   const ctx = {
-    store, route, hub, mailer, photos, baseUrl, HttpError, isAdmin,
+    store, route, hub, mailer, photos, looks, baseUrl, HttpError, isAdmin, selfieChecker,
     newUser: (o) => newUser(store, o),
     cookie,
     startSession(user) {
@@ -108,6 +116,7 @@ export function createApp(store, opts = {}) {
         unread: unreadCount(user.id),
         notifications: (store.data.notifications[user.id] || []).filter((n) => !n.read).length,
         admin: isAdmin(user),
+        plus: isPlus(user),
       };
     },
     // In-app notification, pushed live; emailed when the person is not online and wants that kind.
@@ -137,7 +146,8 @@ export function createApp(store, opts = {}) {
     return n;
   }
 
-  for (const register of [account, chat, profile, week, matches, notifications, admin]) register(ctx);
+  // verification first: it provides ctx.onPhotoAdded, which the photo upload calls.
+  for (const register of [verification, account, chat, profile, week, matches, dates, notifications, admin]) register(ctx);
   route('GET', '/api/health', async () => ({ body: { ok: true, version: VERSION, engine: pickEngine().name, uptime: Math.round(process.uptime()) } }), { auth: false });
 
   function serveStatic(req, res) {
