@@ -147,10 +147,14 @@ export async function respond(user, convo, rawText, engine = pickEngine()) {
   const choice = pending?.choices?.find((c) => typeof c === 'object' && c.label.toLowerCase() === text.toLowerCase());
   if (choice) {
     applyUpdate(user, {
-      traitUpdates: Object.entries(choice.set).map(([trait, value]) => ({ trait, value, confidence: 0.55 })),
+      traitUpdates: Object.entries(choice.set || {}).map(([trait, value]) => ({ trait, value, confidence: 0.55 })),
+      preferenceUpdates: choice.prefer || [],
       tags: choice.tags || [],
+      aspects: choice.aspects,
+      facts: choice.facts,
     });
     Object.assign(user.basics, choice.basics || {});
+    applyPassChoice(user, convo, pending, choice);
     choiceApplied = true;
   }
 
@@ -207,6 +211,29 @@ export function askNow(user, convo) {
   if (convo.pending?.id) convo.asked = convo.asked.filter((id) => id !== convo.pending.id);
   const q = nextQuestion(user, convo);
   return say(convo, q.text, q);
+}
+
+// A quick reply to one of the "why did you pass" questions: remember the reason,
+// tighten the search if asked, and line up the follow-up question.
+function applyPassChoice(user, convo, pending, choice) {
+  const cid = pending.id.replace(/^fb\w?_/, '');
+  user.hidden.passReasons ||= [];
+  user.hidden.limits ||= {};
+  if (choice.reason) {
+    user.hidden.passReasons.push({ candidateId: cid, reason: choice.reason, at: now().toISOString() });
+    user.hidden.passReasons = user.hidden.passReasons.slice(-30);
+  }
+  if (choice.detail) {
+    const last = user.hidden.passReasons.findLast((r) => r.candidateId === cid);
+    if (last) last.detail = choice.detail;
+  }
+  if (choice.limits) {
+    const l = user.hidden.limits;
+    Object.assign(l, choice.limits);
+    // Never leave an impossible age window behind.
+    if (l.ageMin != null && l.ageMax != null && l.ageMin > l.ageMax) delete l[choice.limits.ageMin != null ? 'ageMax' : 'ageMin'];
+  }
+  if (choice.then) convo.events.unshift(choice.then);
 }
 
 export function queueEvent(convo, event) {

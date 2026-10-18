@@ -20,6 +20,16 @@ const LEXICON = [
   [/\b(atheist|secular|agnostic)\b/, 'spirituality', 0],
   [/\b(gym|run(ning)?|hik(e|es|ing)|sports?|climb(ing)?|cycl(e|ing)|fitness|active|training|swim(ming)?|yoga|surf(ing)?|football|tennis|marathon)\b/, 'activity', 1],
   [/\b(couch|sofa|lazy|netflix|lie[- ]in|nap|chill(ing)?|slow mornings?)\b/, 'activity', 0],
+  [/\b(hugs?|cuddl(e|es|ing)|affectionate|hold(ing)? hands|touchy|romantic)\b/, 'affection', 1],
+  [/\b(reserved|not (very )?touchy|private person|undemonstrative)\b/, 'affection', 0],
+  [/\b(talk(ing)? it (out|through)|clear the air|communicat(e|ion)|honest conversations?|address it)\b/, 'conflict', 1],
+  [/\b(cool off|need space|walk away|time to think|sleep on it|go quiet)\b/, 'conflict', 0],
+  [/\b(tidy|clean|neat|organised|organized|minimalist|spotless|declutter)\b/, 'tidiness', 1],
+  [/\b(messy|mess|clutter(ed)?|chaos|chaotic)\b/, 'tidiness', 0],
+  [/\b(my own time|own space|me time|independent|alone time|own thing)\b/, 'independence', 1],
+  [/\b(everything together|inseparable|always together|partner in crime)\b/, 'independence', 0],
+  [/\b(jok(e|es|ing)|puns?|silly|goofy|banter|sarcas(m|tic)|funny|laugh(ing)?|teas(e|ing))\b/, 'humour', 1],
+  [/\b(earnest|sincere)\b/, 'humour', 0],
 ];
 
 const NEGATION = /\b(not|don'?t|do not|never|no|hate|can'?t stand|dislike|isn'?t|aren'?t|without|less)\b/;
@@ -81,7 +91,8 @@ export function findTags(text) {
   else if (/\bsmok(e|er|ing)\b/.test(t)) tags.push('smoker');
   if (/\b(sober|teetotal|(don'?t|do not|never) drink|no alcohol)\b/.test(t)) tags.push('sober');
   else if (/\b(drink|wine|beer|cocktails?|pints?)\b/.test(t)) tags.push('drinks');
-  if (/\b(vegetarian|vegan)\b/.test(t)) tags.push('vegetarian');
+  if (/\bvegan\b/.test(t)) tags.push('vegan');
+  else if (/\bvegetarian\b/.test(t)) tags.push('vegetarian');
   if (/\b(my|our) (dog|cat|puppy|kitten)\b|\bpets?\b/.test(t) && !/\b(allerg|no pets)/.test(t)) tags.push('pets');
   if (/\b(night owl|stay up late|late nights)\b/.test(t)) tags.push('night-owl');
   if (/\b(early bird|early riser|up at (5|6))\b/.test(t)) tags.push('early-bird');
@@ -120,4 +131,18 @@ const VALUE_WORDS = ['honesty', 'kindness', 'loyalty', 'humour', 'humor', 'curio
 export function findValues(text) {
   const t = text.toLowerCase();
   return VALUE_WORDS.filter((v) => t.includes(v)).map((v) => (v === 'humor' ? 'humour' : v));
+}
+
+const LANGUAGES = ['English', 'Spanish', 'French', 'German', 'Italian', 'Portuguese', 'Dutch', 'Arabic', 'Persian', 'Farsi', 'Turkish', 'Hindi', 'Urdu', 'Bengali', 'Mandarin', 'Cantonese', 'Japanese', 'Korean', 'Russian', 'Polish', 'Greek', 'Swedish', 'Hebrew'];
+
+// Plain facts someone stated outright, as shared-profile suggestions.
+export function findFacts(text, questionId) {
+  const facts = {};
+  const spoken = LANGUAGES.filter((l) => new RegExp(`\\b${l}\\b`, 'i').test(text));
+  if (spoken.length && /\b(speak|fluent|languages?|bilingual|native)\b/i.test(text)) facts.languages = spoken.join(', ');
+  if (questionId === 'q_work') {
+    const m = text.match(/\b(?:i(?:'| a)m an?|i work as an?|i'm working as an?)\s+([a-z][a-z -]{2,40}?)(?=[,.;!]| and | at | in | for |$)/i);
+    if (m) facts.work = m[1].trim().replace(/^\w/, (c) => c.toUpperCase());
+  }
+  return facts;
 }

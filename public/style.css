@@ -155,6 +155,8 @@ label { display: block; font-size: .875rem; color: var(--muted); margin-bottom: 
 .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; padding: 0; list-style: none; }
 .tags li { border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: .85rem; color: var(--muted); }
 .tags li button { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0 0 0 4px; }
+.facts { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 14px 0 0; padding: 0; list-style: none; font-size: .9rem; }
+.facts li span { color: var(--muted); margin-right: 4px; }
 .qa { margin-top: 16px; }
 .qa dt { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .qa dd { margin: 2px 0 12px; }

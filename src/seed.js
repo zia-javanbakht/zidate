@@ -1,6 +1,6 @@
 // Demo people so a fresh install has someone to suggest. Deterministic: same seed, same people.
 import { fileURLToPath } from 'node:url';
-import { TRAIT_KEYS, INTERESTS, clamp01 } from './traits.js';
+import { TRAIT_KEYS, CORE_TRAITS, INTERESTS, ASPECTS, FACTS, clamp01 } from './traits.js';
 import { newUser } from './app.js';
 
 const WOMEN = ['Maya', 'Leila', 'Sofia', 'Hannah', 'Amara', 'Chloe', 'Ines', 'Nadia', 'Freya', 'Yuki', 'Priya', 'Elena', 'Zara', 'Grace', 'Noor', 'Clara', 'Ava', 'Mina', 'Lucia', 'Ruth'];
@@ -27,6 +27,9 @@ export function seedDemo(store, { count = 64, seed = 7 } = {}) {
   if (Object.values(store.data.users).some((u) => u.demo)) return 0;
   const r = rng(seed);
   const pick = (arr) => arr[Math.floor(r() * arr.length)];
+  // Newer profile parts draw from their own sequence, so the original demo people stay the same.
+  const r2 = rng(seed + 1);
+  const pick2 = (arr) => arr[Math.floor(r2() * arr.length)];
   let made = 0;
   for (let i = 0; i < count; i++) {
     const roll = r();
@@ -37,7 +40,9 @@ export function seedDemo(store, { count = 64, seed = 7 } = {}) {
     const user = newUser(store, { name, email: `demo${i}@zidate.local`, password: null });
     user.demo = true;
     user.basics = { gender, seeking, age: 22 + Math.floor(r() * 24), city: DEMO_CITIES[i % DEMO_CITIES.length] };
-    for (const k of TRAIT_KEYS) user.hidden.traits[k] = { value: clamp01(Math.round(r() * 100) / 100), confidence: 0.5 + Math.round(r() * 30) / 100 };
+    for (const k of CORE_TRAITS) user.hidden.traits[k] = { value: clamp01(Math.round(r() * 100) / 100), confidence: 0.5 + Math.round(r() * 30) / 100 };
+    for (const k of TRAIT_KEYS.filter((t) => !CORE_TRAITS.includes(t))) user.hidden.traits[k] = { value: clamp01(Math.round(r2() * 100) / 100), confidence: 0.3 + Math.round(r2() * 30) / 100 };
+    user.hidden.aspects = { loveLanguage: pick2(Object.keys(ASPECTS.loveLanguage)), pace: pick2(Object.keys(ASPECTS.pace)) };
     const fam = user.hidden.traits.family.value;
     user.hidden.tags = [fam > 0.7 ? 'wants-kids' : fam < 0.3 ? 'no-kids' : null, r() < 0.15 ? 'smoker' : 'non-smoker', r() < 0.25 ? 'sober' : 'drinks', r() < 0.3 ? 'pets' : null].filter(Boolean);
     user.hidden.values = [pick(['honesty', 'kindness', 'curiosity', 'family', 'humour']), pick(['growth', 'loyalty', 'adventure', 'respect'])];
@@ -48,6 +53,16 @@ export function seedDemo(store, { count = 64, seed = 7 } = {}) {
     const p1 = pick(prompts);
     const p2 = pick(prompts.filter((p) => p !== p1));
     user.shared.items = [p1, p2].map((prompt, j) => ({ id: `it_demo${i}_${j}`, prompt, text: pick(LINES[prompt]), status: 'approved' }));
+    const tag = (t) => user.hidden.tags.includes(t);
+    user.shared.facts = Object.fromEntries(Object.entries({
+      work: pick2(['Nurse', 'Teacher', 'Software engineer', 'Architect', 'Chef', 'Designer', 'Accountant', 'Physiotherapist', 'Journalist', 'Student']),
+      education: pick2(FACTS.education.options),
+      languages: pick2(['English', 'English, Spanish', 'English, French', 'English, German', 'English, Arabic', 'English, Persian']),
+      kids: tag('wants-kids') ? 'Wants kids' : tag('no-kids') ? "Doesn't want kids" : 'Open to kids',
+      drinking: tag('sober') ? "Doesn't drink" : pick2(['Drinks', 'Sometimes']),
+      smoking: tag('smoker') ? 'Smokes' : "Doesn't smoke",
+      pets: tag('pets') ? 'Has pets' : null,
+    }).filter(([, v]) => v && r2() < 0.8).map(([k, value]) => [k, { value, status: 'approved' }]));
     user.shared.bio = `${user.hidden.traits.social.value > 0.5 ? 'Happiest around a full table.' : 'Small plans, good company.'} Into ${user.shared.interests.slice(0, 2).join(' and ')}.`;
     made++;
   }

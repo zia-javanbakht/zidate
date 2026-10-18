@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { hashPassword, newToken, parseCookies } from './auth.js';
 import { emptyHidden } from './traits.js';
 import { newConversation, pickEngine } from './agent/index.js';
-import { completeness, isReady, settingsOf } from './profile.js';
+import { completeness, isReady, settingsOf, upgradeUser } from './profile.js';
 import { HttpError, readBody, send, router, limiter } from './http.js';
 import { createHub } from './events.js';
 import { createMailer } from './mailer.js';
@@ -41,7 +41,7 @@ export function newUser(store, { name, email, password }) {
     createdAt: now().toISOString(),
     basics: { gender: null, seeking: null, age: null, city: null },
     hidden: emptyHidden(),
-    shared: { bio: '', bioDraft: '', interests: [], items: [] },
+    shared: { bio: '', bioDraft: '', interests: [], items: [], facts: {} },
     photos: [],
   };
   settingsOf(user);
@@ -60,6 +60,8 @@ export function createApp(store, opts = {}) {
     baseUrl = 'http://localhost:3000',
     log = false,
   } = opts;
+  // People stored before the profile gained new parts get them now.
+  for (const u of Object.values(store.data.users)) upgradeUser(u);
   const allow = limiter();
   const { route, match } = router();
   const hub = createHub();

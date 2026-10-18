@@ -1,8 +1,8 @@
 // Both profiles: approving and writing shared lines, bio, interests, photos, dealbreakers,
 // and correcting the hidden profile.
-import { basicsDone, describeHidden, publicProfile, cleanText, hasContactInfo, settingsOf } from '../profile.js';
+import { basicsDone, describeHidden, publicProfile, cleanText, cleanFact, hasContactInfo, settingsOf } from '../profile.js';
 import { askNow } from '../agent/index.js';
-import { INTERESTS, TAGS } from '../traits.js';
+import { INTERESTS, TAGS, FACTS, FACT_KEYS } from '../traits.js';
 import { decodeUpload, mimeFor, MAX_PHOTOS } from '../photos.js';
 import { matchId } from '../matching.js';
 import { weekKey } from '../clock.js';
@@ -13,6 +13,8 @@ export const PROMPTS = [
   'What makes me laugh', 'What matters most to me', "Something I'm proud of", 'How my friends describe me',
   'Where I want to be in five years', 'A tradition I want to keep', 'Something that changed my mind',
   'How I like to spend a free afternoon', 'The way to win me over', 'A small thing that makes my day',
+  'My idea of a great first date', 'Green flags I look for', 'What my home says about me', 'Something I keep just for me',
+  'A story that still makes me laugh',
 ];
 
 export default function profile({ store, route, HttpError, meView, photos }) {
@@ -25,6 +27,7 @@ export default function profile({ store, route, HttpError, meView, photos }) {
       prompts: PROMPTS,
       interests: INTERESTS,
       tags: TAGS,
+      facts: FACTS,
       me: meView(user),
     },
   }));
@@ -87,6 +90,52 @@ export default function profile({ store, route, HttpError, meView, photos }) {
     convo.events.unshift({ type: 'recheck', trait: params.key });
     if (basicsDone(user)) askNow(user, convo);
     return { body: { ok: true } };
+  });
+
+  // Facts (work, languages, kids…): set several at once. An empty value removes one.
+  // Anything the person sets themselves is shown straight away.
+  route('PUT', '/api/profile/facts', async ({ user, body }) => {
+    const input = body.facts && typeof body.facts === 'object' ? body.facts : {};
+    user.shared.facts ||= {};
+    for (const [key, raw] of Object.entries(input)) {
+      if (!FACTS[key]) throw new HttpError(400, 'Unknown fact.');
+      if (!cleanText(raw, 60)) {
+        delete user.shared.facts[key];
+        continue;
+      }
+      if (!FACTS[key].options && hasContactInfo(raw)) throw new HttpError(400, NO_CONTACT);
+      const value = cleanFact(key, raw);
+      if (!value) throw new HttpError(400, `Pick one of the options for ${FACTS[key].label.toLowerCase()}.`);
+      user.shared.facts[key] = { value, status: 'approved' };
+    }
+    return { body: { facts: user.shared.facts } };
+  });
+
+  // Show or hide one fact, e.g. a suggestion from the matchmaker.
+  route('PATCH', '/api/profile/facts/:key', async ({ user, params, body }) => {
+    const fact = user.shared.facts?.[params.key];
+    if (!fact) throw new HttpError(404, 'Not found.');
+    if (!['approved', 'hidden', 'suggested'].includes(body.status)) throw new HttpError(400, 'Unknown status.');
+    fact.status = body.status;
+    return { body: { fact } };
+  });
+
+  route('POST', '/api/profile/facts/approve-all', async ({ user }) => {
+    let n = 0;
+    for (const k of FACT_KEYS) {
+      const f = user.shared.facts?.[k];
+      if (f?.status === 'suggested') (f.status = 'approved'), n++;
+    }
+    return { body: { approved: n } };
+  });
+
+  // Limits learned from passes live in the hidden profile, but the person can lift them.
+  route('DELETE', '/api/profile/limits/:key', async ({ user, params }) => {
+    const l = (user.hidden.limits ||= {});
+    const keys = { localOnly: ['localOnly'], age: ['ageMin', 'ageMax'], prefersDetail: ['prefersDetail'] }[params.key];
+    if (!keys) throw new HttpError(404, 'Not found.');
+    for (const k of keys) delete l[k];
+    return { body: { limits: describeHidden(user).limits } };
   });
 
   route('POST', '/api/profile/interests', async ({ user, body }) => {

@@ -117,6 +117,38 @@ export async function profile() {
     reload();
   });
 
+  // --- facts: work, languages, kids… ---
+  const facts = shared.facts || {};
+  const factKeys = Object.keys(data.facts);
+  const editFacts = act(async () => {
+    const v = await ask({
+      title: 'About you',
+      text: 'Fill in what you are happy to show. Leave anything blank to keep it off your profile.',
+      fields: factKeys.map((k) => {
+        const def = data.facts[k];
+        const value = facts[k]?.status === 'hidden' ? '' : facts[k]?.value || '';
+        return def.options
+          ? { name: k, label: def.label, type: 'select', value, options: [['', 'Not shown'], ...def.options] }
+          : { name: k, label: def.label, value, maxlength: 60 };
+      }),
+    });
+    if (!v) return;
+    await api('PUT', '/api/profile/facts', { facts: v });
+    reload();
+  });
+  const shownFacts = factKeys.filter((k) => facts[k] && facts[k].status !== 'hidden');
+  const suggestedFacts = shownFacts.filter((k) => facts[k].status === 'suggested');
+  const factsBlock = h('div', { class: 'item' },
+    h('div', { class: 'prompt' }, 'About'),
+    shownFacts.length
+      ? h('ul', { class: 'facts' }, shownFacts.map((k) => h('li', {},
+        h('span', {}, `${data.facts[k].label}:`), facts[k].value,
+        facts[k].status === 'suggested' ? h('em', { class: 'small muted' }, ' (suggested)') : null)))
+      : h('p', { class: 'text muted' }, 'Work, languages, kids and more. Only what you choose to show.'),
+    h('div', { class: 'row' },
+      suggestedFacts.length ? h('button', { class: 'btn small', onclick: act(async () => { await api('POST', '/api/profile/facts/approve-all'); reload(); }) }, suggestedFacts.length > 1 ? `Show these ${suggestedFacts.length} suggestions` : 'Show the suggestion') : null,
+      h('button', { class: 'btn small ghost', onclick: editFacts }, shownFacts.length ? 'Edit' : 'Add')));
+
   const suggested = items.filter((i) => i.status === 'suggested').length;
   const sharedBlock = h('section', { class: 'card stack' },
     h('div', { class: 'section-head' }, h('h2', {}, 'Shared profile'), h('span', { class: 'small muted' }, 'What matches see')),
@@ -129,6 +161,7 @@ export async function profile() {
       }) }, `Show all ${suggested} suggestions`))
       : null,
     bioBlock,
+    factsBlock,
     ...itemNodes,
     h('div', { class: 'item' }, h('button', { class: 'btn small ghost', onclick: addLine }, '+ Add a line of my own')),
     h('div', { class: 'item' }, h('div', { class: 'prompt' }, 'Interests'),
@@ -171,6 +204,11 @@ export async function profile() {
       h('ul', { class: 'tags' },
         hidden.dealbreakers.map((t) => h('li', {}, pretty(t), h('button', { 'aria-label': `Remove dealbreaker ${pretty(t)}`, onclick: act(async () => { await api('DELETE', `/api/profile/dealbreakers/${encodeURIComponent(t)}`); reload(); }) }, '×'))),
         h('li', {}, h('button', { class: 'add-tag', onclick: addDealbreaker }, '+ Add')))),
+    hidden.aspects?.length ? h('div', {}, h('div', { class: 'prompt small muted' }, 'Also noted'), h('ul', { class: 'tags' }, hidden.aspects.map((a) => h('li', {}, cap(a.label))))) : null,
+    hidden.limits?.length ? h('div', {}, h('div', { class: 'prompt small muted' }, 'Learned from your passes'),
+      h('ul', { class: 'tags' }, hidden.limits.map((l) => h('li', {}, l.text,
+        h('button', { 'aria-label': `Stop: ${l.text}`, onclick: act(async () => { await api('DELETE', `/api/profile/limits/${l.key}`); reload(); }) }, '×'))))) : null,
+    hidden.passReasons?.length ? h('p', { class: 'small muted' }, `Why you passed so far: ${hidden.passReasons.map((r) => (r.count > 1 ? `${r.label} (${r.count})` : r.label)).join(', ')}.`) : null,
     hidden.notes.length ? h('div', {}, h('div', { class: 'prompt small muted' }, 'Notes'), h('ul', { class: 'notes' }, hidden.notes.map((n) => h('li', {}, n)))) : null);
 
   render(h('div', { class: 'stack' },
