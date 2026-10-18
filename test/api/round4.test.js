@@ -340,3 +340,28 @@ test('privacy review: notes, plans and date reviews are in the export and go wit
   assert.equal(Object.values(s.store.data.dates).filter((d) => d.userId === A.id).length, 0);
   await s.close();
 });
+
+test('demo review: demo people answer a note, never hold a week or nag, and cannot be shared as a date', async () => {
+  const s = await startServer();
+  const a = client(s.base);
+  const A = (await onboard(a, { name: 'Ana', email: 'demo-review@x.co', answers: { ...ANSWERS, b_gender: 'Woman', b_seeking: 'Men' } })).me;
+  s.store.data.users[A.id].emailVerified = true;
+  await a.put('/api/settings', { trustedContact: { name: 'Sara', email: 'sara@friend.co' } });
+  const picks = (await a.get('/api/week')).data.picks;
+  let match = null;
+  for (const p of picks) {
+    match = (await a.post(`/api/week/${p.id}`, { decision: 'like', note: 'Hello there, nice profile' })).data.match;
+    if (match) break;
+  }
+  assert.ok(match, 'a demo person liked back');
+  const mid = encodeURIComponent(match.id);
+  const t = (await a.get(`/api/matches/${mid}`)).data;
+  assert.deepEqual(t.messages.map((m) => m.mine), [true, false], 'the note, then their answer');
+  assert.equal((await a.post(`/api/matches/${mid}/date`, { when: new Date(Date.now() + 864e5).toISOString(), place: 'Park' })).status, 400);
+  clock.advance(8 * 864e5);
+  tick(s.store, s.ctx);
+  assert.ok(!s.store.data.notifications[A.id].some((n) => /waiting for your reply/.test(n.text)));
+  assert.notEqual((await a.get('/api/week')).data.held, true);
+  clock.reset();
+  await s.close();
+});

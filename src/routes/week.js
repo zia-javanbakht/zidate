@@ -1,7 +1,7 @@
 // The weekly two: see them, decide, widen the search, report.
 import { weeklyPicks, compatibility, currentWeek, available, fillWeek, canWiden, PER_WEEK } from '../matching.js';
 import { queueEvent, askNow } from '../agent/index.js';
-import { learnFromLike, createMatch, passEvent } from '../social.js';
+import { learnFromLike, createMatch, passEvent, demoReply } from '../social.js';
 import { cleanText } from '../profile.js';
 import { now } from '../clock.js';
 import { noteDecision } from '../signals.js';
@@ -57,6 +57,12 @@ export default function week(ctx) {
       // Demo people answer instantly, and only if they would like this person too.
       if (other.demo && compatibility(other, user) >= 0.6) store.data.likes[`${other.id}>${user.id}`] = now().toISOString();
       if (store.data.likes[`${other.id}>${user.id}`]) match = createMatch(ctx, user, other);
+      // A demo person answers a note straight away, as they answer messages.
+      const thread = match && other.demo ? store.data.messages[match.id] : null;
+      if (thread?.length) {
+        thread.push({ from: other.id, text: demoReply(other, user, thread), at: new Date(Date.parse(now().toISOString()) + 1).toISOString() });
+        match.seen[other.id] = thread.at(-1).at;
+      }
     }
     if (!match && decision === 'pass') {
       queueEvent(convo, passEvent(user, other));

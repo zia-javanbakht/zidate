@@ -19,6 +19,7 @@ export default function dates(ctx) {
     if (!m || !m.users.includes(user.id)) throw new HttpError(404, 'Not found.');
     const other = store.data.users[m.users.find((u) => u !== user.id)];
     if (!other) throw new HttpError(404, 'Not found.');
+    if (other.demo) throw new HttpError(400, `${other.name} is a demo profile, so there is no real date to share.`);
     const contact = settingsOf(user).trustedContact;
     if (!contact) throw new HttpError(400, 'Add a trusted contact first.');
     if (!user.emailVerified) throw new HttpError(403, 'Confirm your own email first, so we know these emails come from you.');

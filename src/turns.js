@@ -52,7 +52,8 @@ export function runNudges(ctx) {
     const last = msgs.at(-1);
     const x = last.from === a.id ? b : a; // whose turn it is
     const y = x === a ? b : a;
-    if (x.demo || age(last.at) < NUDGE_DAYS * DAY || m.nudged?.[x.id] === last.at) continue;
+    // Demo people always have the last word, so they never count as waiting.
+    if (x.demo || y.demo || age(last.at) < NUDGE_DAYS * DAY || m.nudged?.[x.id] === last.at) continue;
     m.nudged = { ...m.nudged, [x.id]: last.at };
     if (notify(x, { type: 'nudge', text: `${y.name} is waiting for your reply. Answer, or close it kindly.`, link })) n++;
   }
