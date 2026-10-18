@@ -6,6 +6,7 @@ import { normalizeCity } from '../cities.js';
 import { now, validTimeZone } from '../clock.js';
 import { currentWeek, SEEKING } from '../matching.js';
 import { signalsOf, summarizeSignals, forget } from '../signals.js';
+import { forgetReviews } from '../dates.js';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TOKEN_TTL = { verify: 7 * 864e5, reset: 3600e3 };
@@ -220,6 +221,7 @@ export default function account(ctx) {
       conversationWithMatchmaker: store.data.conversations[user.id]?.messages || [],
       datePlans: Object.values(store.data.dates || {}).filter((d) => d.userId === user.id),
       likes: mine('likes'),
+      notesSentWithLikes: Object.entries(store.data.likeNotes || {}).filter(([k]) => k.split('>')[0] === user.id).map(([k, n]) => ({ person: k.split('>')[1], ...n })),
       passes: mine('passes'),
       matches: Object.values(store.data.matches).filter((m) => m.users.includes(user.id)).map((m) => ({
         with: store.data.users[m.users.find((u) => u !== user.id)]?.name,
@@ -242,6 +244,8 @@ export default function account(ctx) {
     delete store.data.users[id];
     delete store.data.conversations[id];
     forget(store, id);
+    forgetReviews(store, id);
+    for (const k of Object.keys(store.data.held || {})) if (k.startsWith(`${id}:`)) delete store.data.held[k];
     delete store.data.suggested?.[id];
     delete store.data.notifications?.[id];
     endSessions(id);

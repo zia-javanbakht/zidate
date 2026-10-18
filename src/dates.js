@@ -8,7 +8,7 @@ import { now } from './clock.js';
 import crypto from 'node:crypto';
 
 // Reviews are filed under a one-way key, so the record about someone never names who met them.
-const reviewer = (id) => crypto.createHash('sha256').update(`pishi-review:${id}`).digest('base64url').slice(0, 16);
+export const reviewer = (id) => crypto.createHash('sha256').update(`pishi-review:${id}`).digest('base64url').slice(0, 16);
 
 export const MET = {
   again: 'We met, and I want to see them again',
@@ -63,4 +63,10 @@ export function dateRating(sig) {
 // People who said someone did not look like their photos.
 export function photoMismatches(sig) {
   return Object.values(sig?.dateReviews || {}).filter((r) => r.reason === 'photos').length;
+}
+
+// When someone deletes their account, what they said about the people they met goes too.
+export function forgetReviews(store, userId) {
+  const key = reviewer(userId);
+  for (const sig of Object.values(store.data.signals || {})) delete sig.dateReviews?.[key];
 }

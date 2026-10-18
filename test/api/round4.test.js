@@ -317,3 +317,26 @@ test('opening questions: shown on the card and offered first to a match', async 
   assert.ok(t.icebreakers.length >= 3);
   await s.close();
 });
+
+test('privacy review: notes, plans and date reviews are in the export and go with the account', async () => {
+  const { s, a, b, A, B } = await two();
+  await a.post(`/api/week/${B.id}`, { decision: 'like', note: 'Your Sunday sounds great' });
+  let exp = (await a.get('/api/me/export')).data;
+  assert.deepEqual(exp.notesSentWithLikes.map((n) => n.note), ['Your Sunday sounds great']);
+  s.store.data.users[A.id].emailVerified = true;
+  const mid = encodeURIComponent((await b.post(`/api/week/${A.id}`, { decision: 'like' })).data.match.id);
+  await a.put('/api/settings', { trustedContact: { name: 'Sara', email: 'sara@friend.co' } });
+  await a.post(`/api/matches/${mid}/date`, { when: new Date(Date.now() + 864e5).toISOString(), place: 'The park' });
+  await a.post(`/api/matches/${mid}/met`, { answer: 'once' });
+  exp = (await a.get('/api/me/export')).data;
+  assert.equal(exp.datePlans[0].place, 'The park');
+  assert.deepEqual(exp.matchingSignals.summary.meetings, ['once']);
+  // Ben's export counts reviews but never says what they were.
+  const benExp = (await b.get('/api/me/export')).data;
+  assert.deepEqual(benExp.matchingSignals.raw.dateReviews, { count: 1 });
+  assert.ok(!JSON.stringify(benExp).includes('"once"'));
+  assert.equal((await a.del('/api/me')).status, 200);
+  assert.equal(Object.keys(s.store.data.signals[B.id].dateReviews).length, 0, 'what Ana said about Ben goes with her account');
+  assert.equal(Object.values(s.store.data.dates).filter((d) => d.userId === A.id).length, 0);
+  await s.close();
+});
