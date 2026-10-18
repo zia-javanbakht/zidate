@@ -29,6 +29,10 @@ function parseBasic(key, text) {
     return null;
   }
   if (key === 'seeking') {
+    const nb = /non[- ]?binary|enby|\bnb\b/.test(t);
+    if (nb && /\b(women|woman|girls|ladies)\b/.test(t)) return 'women-nb';
+    if (nb && /\b(men|man|guys)\b/.test(t)) return 'men-nb';
+    if (nb) return 'nonbinary';
     if (/^(women|woman|female|girls|ladies)$/.test(t)) return 'women';
     if (/^(men|man|male|guys)$/.test(t)) return 'men';
     if (/everyone|both|any|all|anyone|doesn'?t matter/.test(t)) return 'everyone';
@@ -224,6 +228,7 @@ const NUDGES = {
   review: 'I have suggested some lines for your shared profile. They only appear once you approve them.',
   facts: 'A few plain facts, like your work or whether you want kids, save your matches a lot of guessing.',
   interests: 'Add a few interests so I can tell your matches what you have in common.',
+  openers: 'Add an opening question to your profile. Your matches can answer it, so nobody has to think of a first line.',
   dealbreakers: 'Is there anything you could never accept in a partner? You can set dealbreakers on your profile.',
 };
 

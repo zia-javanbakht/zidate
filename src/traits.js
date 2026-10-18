@@ -55,6 +55,7 @@ export const ASPECTS = {
 // Plain facts a person can show on their shared profile. The matchmaker may suggest
 // them from the conversation; like every shared line, they appear only once approved.
 export const FACTS = {
+  pronouns: { label: 'Pronouns', options: ['she/her', 'he/him', 'they/them', 'she/they', 'he/they', 'any pronouns'] },
   work: { label: 'Work' },
   education: { label: 'Education', options: ['Secondary school', 'Trade or vocational', 'University', 'Postgraduate'] },
   languages: { label: 'Languages' },

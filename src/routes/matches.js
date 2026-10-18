@@ -1,12 +1,17 @@
 // Matches and messages between people, delivered live.
 import { publicProfile, cleanText } from '../profile.js';
-import { demoReply, icebreakers } from '../social.js';
-import { isAbusive, STRIKES_BEFORE_REPORT } from '../moderation.js';
+import { demoReply, icebreakers, passEvent, dateIdeas } from '../social.js';
+import { recordMet, MET } from '../dates.js';
+import { CLOSE_LINES } from '../turns.js';
+import { activePlan, planView } from '../safety.js';
+import { settingsOf } from '../profile.js';
+import { askNow } from '../agent/index.js';
+import { screenMessage } from '../moderation.js';
 import { now } from '../clock.js';
 import { noteMessage } from '../signals.js';
 
 export default function matches(ctx) {
-  const { store, route, HttpError, hub, notify } = ctx;
+  const { store, route, HttpError, hub, notify, serial } = ctx;
 
   function getMatch(user, id) {
     const m = store.data.matches[id];
@@ -14,7 +19,11 @@ export default function matches(ctx) {
     return m;
   }
   const otherOf = (m, user) => store.data.users[m.users.find((u) => u !== user.id)];
-  const view = (x, user) => ({ text: x.text, at: x.at, mine: x.from === user.id });
+  const view = (x, user) => ({
+    text: x.text, at: x.at, mine: x.from === user.id, ...(x.closing ? { closing: true } : {}),
+    // A like on one line or photo opens the conversation, quoted above the note.
+    ...(x.about ? { about: x.about.kind === 'photo' ? { photo: `/api/photos/${x.about.photoId}` } : { prompt: x.about.prompt, text: x.about.text } } : {}),
+  });
 
   route('GET', '/api/matches', async ({ user }) => {
     const list = Object.values(store.data.matches)
@@ -31,6 +40,8 @@ export default function matches(ctx) {
           last: last ? { text: last.text, mine: last.from === user.id, at: last.at } : null,
           unread: msgs.filter((x) => x.from !== user.id && x.at > seen).length,
           isNew: !seen,
+          closed: Boolean(m.closed),
+          yourTurn: !m.closed && last?.from === other?.id,
         };
       })
       .filter((m) => m.person)
@@ -56,23 +67,27 @@ export default function matches(ctx) {
         person: other ? publicProfile(other, { showPhotos: true }) : null,
         messages: msgs.map((x) => view(x, user)),
         seenByThem: other ? m.seen?.[other.id] || null : null,
-        icebreakers: msgs.length || !other ? [] : icebreakers(user, other),
+        // Ways to start, until you have written something yourself (a note with a like may open it).
+        icebreakers: msgs.some((x) => x.from === user.id) || !other ? [] : icebreakers(user, other),
+        met: m.met?.[user.id]?.answer || null,
+        // Once you have talked a little, some first-date ideas from what you both like.
+        dateIdeas: other && !m.closed && msgs.filter((x) => x.from === user.id).length >= 2 && msgs.filter((x) => x.from === other.id).length >= 2 ? dateIdeas(user, other) : [],
+        closed: m.closed ? { byMe: m.closed.by === user.id, at: m.closed.at } : null,
+        closeLines: CLOSE_LINES,
+        date: (() => { const d = activePlan(store, user.id, m.id); return d ? planView(d, settingsOf(user).timeZone) : null; })(),
+        trustedContact: settingsOf(user).trustedContact?.name || null,
       },
     };
   }, { saves: true });
 
   route('POST', '/api/matches/:id', async ({ user, params, body }) => {
     const m = getMatch(user, params.id);
+    if (m.closed) throw new HttpError(409, 'This conversation is closed.');
     const text = cleanText(body.text, 1000);
     if (!text) throw new HttpError(400, 'Say something first.');
     const other = otherOf(m, user);
-    if (isAbusive(text)) {
-      user.strikes = (user.strikes || 0) + 1;
-      if (user.strikes === STRIKES_BEFORE_REPORT) {
-        store.data.reports.push({ id: store.id('r'), by: 'system', about: user.id, reason: `Automatic: ${STRIKES_BEFORE_REPORT} messages blocked as abusive.`, at: now().toISOString(), status: 'open', source: 'filter' });
-      }
-      throw new HttpError(422, 'That message looks hurtful, so it was not sent. Please keep it kind.');
-    }
+    const problem = screenMessage(store, user, text, { at: now().toISOString() });
+    if (problem) throw new HttpError(422, problem);
     const msg = { from: user.id, text, at: now().toISOString() };
     store.data.messages[m.id].push(msg);
     noteMessage(store, user, store.data.messages[m.id]);
@@ -95,6 +110,47 @@ export default function matches(ctx) {
     }
     return { status: 201, body: { message: view(msg, user), reply } };
   });
+
+  // Close a conversation kindly: a last message (one of ours, or your own words), then the
+  // thread stays readable but quiet. Nobody is left waiting, and nobody is blocked.
+  route('POST', '/api/matches/:id/close', async ({ user, params, body }) => {
+    const m = getMatch(user, params.id);
+    if (m.closed) throw new HttpError(409, 'This conversation is already closed.');
+    const text = cleanText(body.text, 300) || CLOSE_LINES[Number(body.line) || 0] || CLOSE_LINES[0];
+    const problem = screenMessage(store, user, text, { at: now().toISOString() });
+    if (problem) throw new HttpError(422, problem);
+    const msg = { from: user.id, text, at: now().toISOString(), closing: true };
+    store.data.messages[m.id].push(msg);
+    noteMessage(store, user, store.data.messages[m.id]);
+    m.closed = { by: user.id, at: msg.at };
+    m.seen = { ...m.seen, [user.id]: msg.at };
+    const other = otherOf(m, user);
+    if (other) {
+      hub.publish(other.id, 'message', { matchId: m.id, message: view(msg, other) });
+      notify(other, { type: 'message', text: `${user.name} closed your conversation kindly.`, link: `#/match/${encodeURIComponent(m.id)}` });
+    }
+    return { body: { message: view(msg, user) } };
+  });
+
+  // "Did you meet?" from the conversation itself, any time. "Once was enough" hands over to
+  // the matchmaker, who asks why.
+  route('POST', '/api/matches/:id/met', async ({ user, params, body }) => serial(user.id, async () => {
+    const m = getMatch(user, params.id);
+    const other = otherOf(m, user);
+    if (!other) throw new HttpError(404, 'Not found.');
+    if (!MET[body.answer]) throw new HttpError(400, 'Pick one of the answers.');
+    recordMet(store, user, other, body.answer);
+    let ask = false;
+    if (body.answer === 'once') {
+      const convo = store.data.conversations[user.id];
+      // Asked first: they just told us, so it is fresh.
+      convo.events = convo.events.filter((e) => !(e.type === 'met-once' && e.candidateId === other.id));
+      convo.events.unshift({ type: 'met-once', candidateId: other.id, name: other.name, aspects: passEvent(user, other).aspects });
+      if (convo.pending?.kind !== 'feedback') askNow(user, convo);
+      ask = true;
+    }
+    return { body: { met: body.answer, ask } };
+  }));
 
   route('POST', '/api/matches/:id/unmatch', async ({ user, params, body }) => {
     const m = getMatch(user, params.id);

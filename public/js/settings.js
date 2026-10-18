@@ -26,7 +26,7 @@ export async function settings() {
     name: field({ id: 's-name', label: 'First name', value: me.name, maxlength: 40, autocomplete: 'given-name' }),
     age: field({ id: 's-age', label: 'Age', type: 'number', value: b.age ?? '', min: 18, max: 99, inputmode: 'numeric' }),
     gender: field({ id: 's-gender', label: 'I am', type: 'select', value: b.gender || 'woman', options: [['woman', 'a woman'], ['man', 'a man'], ['nonbinary', 'non-binary']] }),
-    seeking: field({ id: 's-seeking', label: 'I want to meet', type: 'select', value: b.seeking || 'everyone', options: [['women', 'women'], ['men', 'men'], ['everyone', 'everyone']] }),
+    seeking: field({ id: 's-seeking', label: 'I want to meet', type: 'select', value: b.seeking || 'everyone', options: [['women', 'women'], ['men', 'men'], ['nonbinary', 'non-binary people'], ['women-nb', 'women and non-binary people'], ['men-nb', 'men and non-binary people'], ['everyone', 'everyone']] }),
     ageRange: field({ id: 's-range', label: 'Age range', type: 'select', value: String(b.ageRange ?? 8), options: [3, 5, 8, 10, 15, 20].map((n) => [String(n), `within ${n} years`]) }),
     city: field({ id: 's-city', label: 'City', value: b.city || '', maxlength: 50, autocomplete: 'address-level2' }),
     distance: field({ id: 's-distance', label: 'How far would you go?', type: 'select', value: b.distance || '', options: [
@@ -91,6 +91,26 @@ export async function settings() {
       toggle(label, null, s.email[k], async (v, el) => {
         if (!(await save({ email: { [k]: v } }))) el.checked = !v;
       })));
+
+  // --- safety: Share Date ---
+  const tc = s.trustedContact;
+  const contact = {
+    name: field({ id: 's-tc-name', label: 'First name', value: tc?.name || '', maxlength: 40 }),
+    email: field({ id: 's-tc-email', label: 'Email', type: 'email', value: tc?.email || '', maxlength: 200 }),
+  };
+  const contactForm = h('form', { class: 'stack', novalidate: true },
+    h('div', { class: 'field-row' }, contact.name.node, contact.email.node),
+    h('div', { class: 'row wrap' },
+      h('button', { class: 'btn small', type: 'submit' }, 'Save contact'),
+      tc ? h('button', { class: 'link small', type: 'button', onclick: async () => { if (await save({ trustedContact: null }, 'Removed.')) settings(); } }, 'Remove') : null));
+  contactForm.onsubmit = async (e) => {
+    e.preventDefault();
+    if (await save({ trustedContact: { name: contact.name.input.value, email: contact.email.input.value } }, 'Saved. Share plans from any conversation.')) settings();
+  };
+  const safety = h('section', { class: 'card' },
+    h('h2', {}, 'Trusted contact'),
+    h('p', { class: 'hint' }, 'Someone I can email your date plans to: who, where and when. After a date I ask if you are home safe, and tell them if I do not hear from you.'),
+    contactForm);
 
   // --- theme ---
   const theme = prefs.get('theme', 'auto');
@@ -162,6 +182,7 @@ export async function settings() {
     h('section', { class: 'card' }, h('h2', {}, 'Basics'), basicsForm),
     weekly,
     privacy,
+    safety,
     emails,
     h('section', { class: 'card' }, h('h2', {}, 'Appearance'), h('div', {}, seg)),
     h('section', { class: 'card' },

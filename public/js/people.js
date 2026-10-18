@@ -8,9 +8,10 @@ export function gallery(photos, name) {
     src, alt: i === 0 ? `Photo of ${name}` : `${name}, photo ${i + 1}`, loading: i === 0 ? null : 'lazy', draggable: 'false',
   })));
   const box = h('div', { class: 'gallery', role: 'region', 'aria-roledescription': 'carousel', 'aria-label': `Photos of ${name}` }, track);
+  let at = 0;
+  box.current = () => at; // which photo is showing, for "Like this photo"
   if (photos.length < 2) return box;
 
-  let at = 0;
   const smooth = () => (matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
   const go = (i) => {
     const to = Math.max(0, Math.min(photos.length - 1, i));
@@ -55,9 +56,31 @@ export function gallery(photos, name) {
   return box;
 }
 
+// A like on one part of someone's profile, as a quote: a line, or one of their photos.
+function quote(on, alt) {
+  if (!on) return null;
+  return h('blockquote', { class: 'about' }, on.photo
+    ? h('img', { src: on.photo, alt, onerror: (e) => e.target.remove() })
+    : [on.prompt ? h('span', { class: 'prompt' }, on.prompt) : null, h('span', {}, on.text)]);
+}
+
 export function personCard(p, { onDecide, onReport } = {}) {
+  const open = onDecide && !p.matchId && !p.decision;
+  const pics = p.photos?.length ? gallery(p.photos, p.name) : null;
+  // Like one particular line or photo, with a note if you want: it gives them something to answer.
+  const likePart = async (on, what) => {
+    const v = await ask({
+      title: `Like ${p.name}'s ${what}`,
+      text: on.kind === 'item' ? `“${p.items[on.index].text}”` : 'They will see which photo you liked.',
+      fields: [{ name: 'note', label: 'Add a note (optional)', type: 'textarea', maxlength: 200, placeholder: 'Something they can answer' }],
+      confirm: 'Send like',
+    });
+    if (v) onDecide('like', [...card.querySelectorAll('.actions button, .heart')], { on, note: v.note });
+  };
+  const heart = (label, on, what) => h('button', { class: 'heart', type: 'button', 'aria-label': label, title: label, onclick: () => likePart(on, what) }, '♥');
   const card = h('article', { class: 'card person' },
-    p.photos?.length ? gallery(p.photos, p.name) : null,
+    pics,
+    open && pics ? h('p', { class: 'like-photo' }, h('button', { class: 'link small', type: 'button', onclick: () => likePart({ kind: 'photo', index: pics.current() }, 'photo') }, '♥ Like this photo')) : null,
     h('h2', {}, p.name, p.verified ? h('span', { class: 'verified', title: 'Their selfie matched their photos' }, 'Verified') : null),
     h('p', { class: 'meta' }, [p.age, p.city, p.demo ? 'demo profile' : null].filter(Boolean).join(' · ')),
     p.photosHidden ? h('p', { class: 'hint' }, `${p.name} shares photos after you match.`) : null,
@@ -65,7 +88,15 @@ export function personCard(p, { onDecide, onReport } = {}) {
     p.reason ? h('p', { class: 'why' }, p.reason) : null,
     p.facts?.length ? h('ul', { class: 'facts', 'aria-label': 'About' }, p.facts.map((f) => h('li', {}, h('span', {}, `${f.label}:`), f.value))) : null,
     p.interests?.length ? h('ul', { class: 'tags', 'aria-label': 'Interests' }, p.interests.map((i) => h('li', {}, i))) : null,
-    p.items?.length ? h('dl', { class: 'qa' }, p.items.flatMap((i) => [h('dt', {}, i.prompt || 'About me'), h('dd', {}, i.text)])) : null);
+    p.openers?.length ? h('div', { class: 'openers' }, h('div', { class: 'prompt' }, `${p.name} would love to be asked`), h('ul', {}, p.openers.map((q) => h('li', {}, q)))) : null,
+    p.items?.length ? h('dl', { class: 'qa' }, p.items.flatMap((i, index) => [h('dt', {}, i.prompt || 'About me'),
+      h('dd', {}, i.text, open ? heart(`Like this line: ${i.prompt || 'About me'}`, { kind: 'item', index }, 'line') : null)])) : null);
+  if (p.likedYou) {
+    card.prepend(h('div', { class: 'liked-you' },
+      h('p', {}, h('strong', {}, p.likedYou.on ? `${p.name} liked your ${p.likedYou.on.photo ? 'photo' : 'line'}` : `${p.name} likes you`)),
+      quote(p.likedYou.on, 'Your photo'),
+      p.likedYou.note ? h('p', { class: 'note' }, `“${p.likedYou.note}”`) : null));
+  }
   if (onDecide) {
     if (p.matchId) {
       card.append(h('p', { class: 'decided' }, 'It is mutual. ', h('a', { href: `#/match/${encodeURIComponent(p.matchId)}` }, `Say hello to ${p.name}`)));
@@ -99,6 +130,13 @@ export async function week() {
     render(empty(h('h2', {}, 'You are paused.'),
       h('p', { class: 'muted' }, 'No one sees you and I am not choosing anyone for you. Your profiles and matches are kept.'),
       resume));
+    return;
+  }
+  if (data.held) {
+    render(empty(
+      h('h2', {}, 'Your two are waiting.'),
+      h('p', { class: 'muted' }, 'Before I introduce anyone new, answer the people already waiting on you, or close those conversations kindly. Nobody here gets left on read.'),
+      h('ul', { class: 'list' }, data.owed.map((o) => h('li', {}, h('a', { href: `#/match/${encodeURIComponent(o.matchId)}` }, h('span', { class: 'name' }, `Reply to ${o.name}`), h('span', { class: 'when' }, '→')))))));
     return;
   }
   if (!data.ready) {
@@ -135,10 +173,10 @@ export async function week() {
     return;
   }
   const cards = data.picks.map((p) => personCard(p, {
-    onDecide: async (decision, buttons) => {
+    onDecide: async (decision, buttons, extra = {}) => {
       buttons.forEach((b) => (b.disabled = true));
       try {
-        const res = await api('POST', `/api/week/${encodeURIComponent(p.id)}`, { decision });
+        const res = await api('POST', `/api/week/${encodeURIComponent(p.id)}`, { decision, ...extra });
         if (res.match) {
           toast(`It is mutual. Say hello to ${p.name}.`);
           location.hash = `#/match/${encodeURIComponent(res.match.id)}`;
@@ -176,7 +214,7 @@ export async function week() {
   render(h('div', { class: 'stack' },
     h('div', {}, h('h1', {}, 'This week'), h('p', { class: 'muted' }, done
       ? `That is this week done. Your next two arrive ${until(data.next)}. Talking more in the meantime makes them better.`
-      : data.picks.length === 1 ? `One person this week, chosen for you. Next suggestions ${until(data.next)}.` : `Two people, chosen for you. Next pair ${until(data.next)}.`)),
+      : `${data.picks.length === 1 ? 'One person this week, chosen for you.' : 'Two people, chosen for you.'} Decide before the next ${data.picks.length === 1 ? 'suggestions arrive' : 'pair arrives'} ${until(data.next)}: undecided suggestions go then.`)),
     h('div', { class: `picks ${data.picks.length > 1 ? 'two' : ''}` }, cards),
     widen ? h('div', { class: 'banner' }, h('span', {}, 'Only one person fit this week.'), widen) : null));
   main.className = 'wide';
@@ -189,24 +227,33 @@ function avatar(person) {
 }
 
 export async function matches() {
-  const { matches: list } = await api('GET', '/api/matches');
+  const [{ matches: list }, { dates }] = await Promise.all([api('GET', '/api/matches'), api('GET', '/api/dates')]);
+  // Shared date plans waiting for "I am home safe", even if that match has ended.
+  const plans = dates.map((d) => h('div', { class: 'banner plan' },
+    h('span', {}, `Your date with ${d.with}: ${d.whenText}, ${d.place}.`),
+    h('button', { class: 'btn small', type: 'button', onclick: async (e) => {
+      e.target.disabled = true;
+      await api('POST', `/api/dates/${encodeURIComponent(d.id)}/safe`);
+      toast(`Thank you. I have told ${d.contact}.`);
+      matches();
+    } }, 'I am home safe')));
   if (!list.length) {
-    render(empty(
+    render(...plans, empty(
       h('h2', {}, 'No matches yet.'),
       h('p', { class: 'muted' }, 'When you and someone like each other, you can talk here.'),
       h('a', { class: 'btn ghost', href: '#/week' }, 'See this week')));
     return;
   }
-  render(h('div', { class: 'stack' }, h('h1', {}, 'Matches'),
+  render(h('div', { class: 'stack' }, h('h1', {}, 'Matches'), ...plans,
     h('ul', { class: 'list' }, list.map((m) => h('li', {},
       h('a', { href: `#/match/${encodeURIComponent(m.id)}` },
         h('div', { class: 'who' }, avatar(m.person),
           h('div', { style: 'min-width:0' },
             h('div', { class: 'name' }, m.person.name),
-            h('div', { class: 'preview' }, m.last ? `${m.last.mine ? 'You: ' : ''}${m.last.text}` : 'Say hello'))),
+            h('div', { class: 'preview' }, m.closed ? 'Closed' : m.last ? `${m.last.mine ? 'You: ' : ''}${m.last.text}` : 'Say hello'))),
         h('div', { class: 'stack', style: 'text-align:right' },
           h('div', { class: 'when' }, ago(m.last?.at || m.createdAt)),
-          m.unread ? h('span', { class: 'badge' }, String(m.unread)) : m.isNew ? h('span', { class: 'badge' }, 'New') : null)))))));
+          m.unread ? h('span', { class: 'badge' }, String(m.unread)) : m.isNew ? h('span', { class: 'badge' }, 'New') : m.yourTurn ? h('span', { class: 'turn small' }, 'Your turn') : null)))))));
   // A new message elsewhere refreshes the list.
   live.on('message', () => matches());
 }
@@ -225,7 +272,9 @@ export async function thread(id) {
   };
   const add = (m) => {
     log.querySelector('.hello')?.remove();
+    if (m.about) log.append(h('div', { class: `liked ${m.mine ? 'user' : 'them'}` }, h('span', { class: 'small muted' }, m.mine ? 'You liked' : `${name} liked`), quote(m.about, m.mine ? `${name}'s photo` : 'Your photo')));
     log.append(h('p', { class: `msg ${m.mine ? 'user' : 'them'}` }, m.text, h('time', { datetime: m.at }, clock(m.at))));
+    if (m.closing) log.append(h('p', { class: 'muted small center closed-note' }, m.mine ? 'You closed this conversation.' : `${name} closed this conversation kindly.`));
     if (m.mine) lastMineAt = m.at;
     showSeen();
   };
@@ -237,6 +286,9 @@ export async function thread(id) {
   const form = h('form', { class: 'composer' }, input, h('button', { class: 'btn', type: 'submit' }, 'Send'));
   const ice = h('div', { class: 'chips', 'aria-label': 'Ways to start' },
     (data.icebreakers || []).map((t) => h('button', { class: 'chip', type: 'button', onclick: () => { input.value = t; input.focus(); } }, t)));
+  const ideas = data.dateIdeas?.length ? h('details', { class: 'ideas' },
+    h('summary', {}, 'Ideas for a first date'),
+    h('ul', {}, data.dateIdeas.map((i) => h('li', {}, h('button', { class: 'link', type: 'button', onclick: () => { input.value = i.message; input.focus(); } }, i.text))))) : null;
   form.onsubmit = async (e) => {
     e.preventDefault();
     const text = input.value.trim();
@@ -261,6 +313,7 @@ export async function thread(id) {
 
   live.on('message', (ev) => {
     if (ev.matchId !== id) return;
+    if (ev.message.closing) return thread(id); // they closed it: show it read-only
     ice.remove();
     add(ev.message);
     api('GET', `/api/matches/${encodeURIComponent(id)}`).catch(() => {}); // marks it read, and tells them it was seen
@@ -275,6 +328,102 @@ export async function thread(id) {
     toast(`${name} ended this match.`);
     location.hash = '#/matches';
   });
+
+  // "Did you meet?" any time, not only when the matchmaker asks a week on.
+  const MET = { again: 'We met, and I want to see them again', once: 'We met, but once was enough', talking: 'We are talking, not met yet', quiet: 'We did not really talk' };
+  const metBtn = h('button', { class: 'link small', type: 'button' }, data.met ? `You said: ${MET[data.met].toLowerCase()}` : 'Did you meet?');
+  metBtn.onclick = async () => {
+    const v = await ask({
+      title: `Did you meet ${name}?`,
+      text: 'Only your matchmaker sees this. It helps me pick better people for you.',
+      fields: [{ name: 'answer', label: 'How it went', type: 'select', value: data.met || 'again', options: Object.entries(MET) }],
+    });
+    if (!v) return;
+    try {
+      const res = await api('POST', `/api/matches/${encodeURIComponent(id)}/met`, v);
+      data.met = res.met;
+      metBtn.textContent = `You said: ${MET[res.met].toLowerCase()}`;
+      if (res.ask) {
+        toast('Thank you. Your matchmaker has one quick question.');
+        location.hash = '#/talk';
+      } else toast('Thank you, noted.');
+    } catch (ex) {
+      toast(ex.message);
+    }
+  };
+
+  // Close kindly: a last message, so nobody is left wondering. The thread stays readable.
+  const closeBtn = data.closed ? null : h('button', { class: 'link small', type: 'button' }, 'Close kindly');
+  if (closeBtn) closeBtn.onclick = async () => {
+    const v = await ask({
+      title: `Close your conversation with ${name}?`,
+      text: 'I will send one last message for you. You can pick one of these or write your own.',
+      fields: [
+        { name: 'line', label: 'Message', type: 'select', options: data.closeLines.map((l, i) => [String(i), l]) },
+        { name: 'text', label: 'Or in your own words (optional)', type: 'textarea', maxlength: 300 },
+      ],
+      confirm: 'Send and close',
+    });
+    if (!v) return;
+    try {
+      await api('POST', `/api/matches/${encodeURIComponent(id)}/close`, { line: Number(v.line), text: v.text });
+      toast(`Closed. Thank you for letting ${name} know.`);
+      thread(id);
+    } catch (ex) {
+      toast(ex.message);
+    }
+  };
+
+  // Share Date: tell someone you trust who, where and when. Only they and you see it.
+  const local = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  const sharePlan = async () => {
+    const tomorrow = new Date(Date.now() + 864e5);
+    tomorrow.setHours(19, 0, 0, 0);
+    const fields = [
+      { name: 'when', label: 'When', type: 'datetime-local', value: data.date ? local(new Date(data.date.when)) : local(tomorrow) },
+      { name: 'place', label: 'Where', maxlength: 120, value: data.date?.place || '', placeholder: 'For example: Café Nero, Market Street' },
+    ];
+    if (!data.trustedContact) {
+      fields.push({ name: 'contactName', label: 'Trusted contact: first name', maxlength: 40 }, { name: 'contactEmail', label: 'Their email', type: 'email', maxlength: 200 });
+    }
+    const v = await ask({
+      title: data.date ? 'Change your plans' : `Share your plans with ${data.trustedContact || 'someone you trust'}`,
+      text: `I will email them who you are meeting, where and when. After the date I will ask if you are home safe, and tell them if I do not hear from you. ${name} is not told.`,
+      fields,
+      confirm: 'Share plans',
+      validate: (x) => (!x.when ? 'When are you meeting?' : !x.place.trim() ? 'Where are you meeting?' : !data.trustedContact && (!x.contactName.trim() || !x.contactEmail.includes('@')) ? 'Who should I tell?' : ''),
+    });
+    if (!v) return;
+    try {
+      if (!data.trustedContact) {
+        const res = await api('PUT', '/api/settings', { trustedContact: { name: v.contactName, email: v.contactEmail } });
+        setMe(res.user);
+      }
+      const res = await api('POST', `/api/matches/${encodeURIComponent(id)}/date`, { when: new Date(v.when).toISOString(), place: v.place });
+      toast(`Shared with ${res.date.contact}.`);
+      thread(id);
+    } catch (ex) {
+      toast(ex.message);
+    }
+  };
+  const planAction = (path, msg) => async () => {
+    try {
+      await api('POST', `/api/dates/${encodeURIComponent(data.date.id)}/${path}`);
+      toast(msg);
+      thread(id);
+    } catch (ex) {
+      toast(ex.message);
+    }
+  };
+  const plan = data.date
+    ? h('div', { class: 'banner plan' },
+      h('span', {}, `Shared with ${data.date.contact}: ${data.date.whenText}, ${data.date.place}.`),
+      h('div', { class: 'row wrap' },
+        h('button', { class: 'btn small', type: 'button', onclick: planAction('safe', `Thank you. I have told ${data.date.contact}.`) }, 'I am home safe'),
+        h('button', { class: 'link small', type: 'button', onclick: sharePlan }, 'Change'),
+        h('button', { class: 'link small', type: 'button', onclick: planAction('cancel', `Called off. I have told ${data.date.contact}.`) }, 'Call off')))
+    : null;
+  const shareBtn = data.date ? null : h('button', { class: 'link small', type: 'button', onclick: sharePlan }, 'Share date plans');
 
   const unmatch = h('button', { class: 'link small', type: 'button' }, 'Unmatch or report');
   unmatch.onclick = async () => {
@@ -295,7 +444,8 @@ export async function thread(id) {
     location.hash = '#/matches';
   };
   render(h('section', { class: 'chat' },
-    h('div', { class: 'section-head' }, h('a', { class: 'back', href: '#/matches' }, '← Matches'), unmatch),
-    personCard(data.person), log, ice, form));
+    h('div', { class: 'section-head' }, h('a', { class: 'back', href: '#/matches' }, '← Matches'), h('div', { class: 'row wrap' }, metBtn, shareBtn, closeBtn, unmatch)),
+    plan,
+    personCard(data.person), log, data.closed ? null : ice, data.closed ? null : ideas, data.closed ? null : form));
   window.scrollTo(0, document.body.scrollHeight);
 }

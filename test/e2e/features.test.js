@@ -73,7 +73,7 @@ test('matches, live messages, profile tools, settings, moderation and password r
     await page.locator('.list .when').first().waitFor();
 
     // Profile: a photo, a line of my own and an interest, all through in-page dialogs.
-    await page.getByRole('link', { name: 'You' }).click();
+    await page.getByRole('link', { name: 'You', exact: true }).click();
     await page.getByRole('heading', { name: 'Photos' }).waitFor();
     await page.locator('input[type=file]').setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: PNG });
     await page.locator('.photo img').first().waitFor();
