@@ -194,6 +194,36 @@ export function nextWeek(user, date = now()) {
   return next;
 }
 
+// Everyone who could be suggested to this person now, best first.
+function rank(store, user) {
+  const seen = everSuggested(store, user.id);
+  const reports = reportCounts(store);
+  return Object.values(store.data.users)
+    .filter((o) => !seen.has(o.id) && isReady(o) && eligible(user, o) && !closed(store, user, o))
+    // Either person may have asked to only meet people in their own city.
+    .filter((o) => sameCity(user, o) || !(user.hidden.limits?.localOnly || o.hidden.limits?.localOnly))
+    // Someone who already liked this person is a likely mutual match: give them a lift.
+    .map((o) => ({ o, s: compatibility(user, o) + signalBoost(store, user, o, reports) + (store.data.likes[`${o.id}>${user.id}`] ? 0.15 : 0), local: sameCity(user, o) }))
+    // People nearby come first; only widen the search when the city runs out.
+    .sort((p, q) => q.local - p.local || q.s - p.s || p.o.id.localeCompare(q.o.id));
+}
+
+// Top up a week to PER_WEEK people, keeping whoever is already in it.
+export function fillWeek(store, user, week) {
+  const fresh = rank(store, user).slice(0, Math.max(0, PER_WEEK - week.picks.length));
+  for (const { o, s } of fresh) {
+    week.picks.push({ id: o.id, score: Math.round(s * 100) / 100, decision: null });
+    noteShown(store, o);
+  }
+  return fresh.length;
+}
+
+// Limits that make a week come up short, which "widen" can lift.
+export function canWiden(user) {
+  const l = user.hidden.limits || {};
+  return (user.basics.ageRange ?? DEFAULT_AGE_RANGE) < 20 || Boolean(l.localOnly || l.ageMin != null || l.ageMax != null);
+}
+
 // Get (or create, once per week) this person's suggestions.
 export function weeklyPicks(store, user) {
   const wk = currentWeek(user);
@@ -210,19 +240,9 @@ export function weeklyPicks(store, user) {
         : ['a few basics (who you are looking for, your age and city)'];
       return { week: wk, ready: false, missing, picks: [], next: nextAt };
     }
-    const seen = everSuggested(store, user.id);
-    const reports = reportCounts(store);
-    const ranked = Object.values(store.data.users)
-      .filter((o) => !seen.has(o.id) && isReady(o) && eligible(user, o) && !closed(store, user, o))
-      // Either person may have asked to only meet people in their own city.
-      .filter((o) => sameCity(user, o) || !(user.hidden.limits?.localOnly || o.hidden.limits?.localOnly))
-      // Someone who already liked this person is a likely mutual match: give them a lift.
-      .map((o) => ({ o, s: compatibility(user, o) + signalBoost(store, user, o, reports) + (store.data.likes[`${o.id}>${user.id}`] ? 0.15 : 0), local: sameCity(user, o) }))
-      // People nearby come first; only widen the search when the city runs out.
-      .sort((p, q) => q.local - p.local || q.s - p.s || p.o.id.localeCompare(q.o.id));
-    week = { createdAt: now().toISOString(), picks: ranked.slice(0, PER_WEEK).map(({ o, s }) => ({ id: o.id, score: Math.round(s * 100) / 100, decision: null })) };
+    week = { createdAt: now().toISOString(), picks: [] };
     store.data.weeks[key] = week;
-    for (const p of week.picks) noteShown(store, store.data.users[p.id]);
+    fillWeek(store, user, week);
     store.save();
   }
   return {
@@ -239,7 +259,7 @@ export function weeklyPicks(store, user) {
         return { ...publicProfile(other, { showPhotos }), reason: reason(user, other), decision: p.decision, matchId: matched ? matchId(user.id, other.id) : null };
       }),
     // Offer to widen the search when this week came up short.
-    widen: week.picks.length < PER_WEEK && (user.basics.ageRange ?? DEFAULT_AGE_RANGE) < 15,
+    widen: week.picks.length < PER_WEEK && canWiden(user),
   };
 }
 

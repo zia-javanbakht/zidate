@@ -56,13 +56,14 @@ export async function week() {
       h('a', { class: 'btn', href: '#/talk' }, 'Keep talking')));
     return;
   }
-  const widen = data.widen ? h('button', { class: 'btn ghost small', type: 'button' }, 'Widen my age range') : null;
+  const widen = data.widen ? h('button', { class: 'btn ghost small', type: 'button' }, 'Widen my search') : null;
   if (widen) {
     widen.onclick = async () => {
       widen.disabled = true;
       try {
         const res = await api('POST', '/api/week/widen');
-        toast(`Now looking within ${res.ageRange} years of you.`);
+        const also = res.lifted?.includes('city') ? ', and beyond your city' : '';
+        toast(res.added ? `Found ${res.added === 1 ? 'someone' : `${res.added} people`} within ${res.ageRange} years of you${also}.` : `Now looking within ${res.ageRange} years of you${also}. No one new yet.`);
         week();
       } catch (ex) {
         toast(ex.message);
@@ -74,7 +75,7 @@ export async function week() {
     render(empty(
       h('h2', {}, 'No one this week.'),
       h('p', { class: 'muted' }, `I would rather suggest no one than the wrong people. New suggestions arrive ${until(data.next)}.`),
-      widen ? h('p', { class: 'muted small' }, 'Being a little more open on age could help.') : null,
+      widen ? h('p', { class: 'muted small' }, 'Being a little more open on age or distance could help.') : null,
       widen,
       h('a', { class: 'btn ghost', href: '#/talk' }, 'Tell me more about you')));
     return;

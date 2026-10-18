@@ -151,3 +151,37 @@ test('reports count once per reporter, and dismissed ones stop counting', () => 
   for (const r of store.data.reports) r.status = 'dismissed';
   assert.equal(signalBoost(store, me, other), before);
 });
+
+test('likes alone cannot push a partner preference past a modest confidence', async () => {
+  const { learnFromLike } = await import('../../src/social.js');
+  const store = new Store(null);
+  const me = person(store);
+  const other = person(store, { social: 0.95 }, { gender: 'man' });
+  for (let i = 0; i < 20; i++) learnFromLike(me, other);
+  assert.ok(me.hidden.preference.social.confidence <= 0.3);
+  // What they told us directly is never lowered by likes.
+  me.hidden.preference.adventure = { value: 0.2, confidence: 0.6 };
+  learnFromLike(me, other);
+  assert.equal(me.hidden.preference.adventure.confidence, 0.6);
+});
+
+test('widening tops up a short week and keeps decisions already made', async () => {
+  const { weeklyPicks, fillWeek, PER_WEEK } = await import('../../src/matching.js');
+  const { currentWeek } = await import('../../src/matching.js');
+  const store = new Store(null);
+  const me = person(store, {}, { ageRange: 3 });
+  const near = person(store, {}, { gender: 'man', seeking: 'women', age: 34, ageRange: 20 });
+  const far = person(store, {}, { gender: 'man', seeking: 'women', age: 40, ageRange: 20 });
+  for (const u of [me, near, far]) store.data.conversations[u.id].flags.readyAnnounced = true;
+  let w = weeklyPicks(store, me);
+  assert.deepEqual(w.picks.map((p) => p.id), [near.id]);
+  assert.equal(w.widen, true);
+  const week = store.data.weeks[`${me.id}:${currentWeek(me)}`];
+  week.picks[0].decision = 'like';
+  me.basics.ageRange = 10;
+  assert.equal(fillWeek(store, me, week), 1);
+  w = weeklyPicks(store, me);
+  assert.equal(w.picks.length, PER_WEEK);
+  assert.equal(w.picks.find((p) => p.id === near.id).decision, 'like');
+  assert.equal(w.widen, false);
+});

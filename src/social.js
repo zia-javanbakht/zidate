@@ -6,12 +6,17 @@ import { queueEvent } from './agent/index.js';
 import { now } from './clock.js';
 import { noteMatch, noteCheckin } from './signals.js';
 
-// Liking someone is also a signal: nudge preferences a little toward them.
+// Liking someone is also a signal: nudge preferences a little toward them. Likes alone
+// never take a preference past LIKE_CAP, so what the person told us keeps the upper hand
+// and a run of similar likes cannot narrow every future week to look-alikes.
+const LIKE_CAP = 0.3;
 export function learnFromLike(user, other) {
   for (const k of TRAIT_KEYS) {
     const t = other.hidden.traits[k];
     if (t.confidence < 0.2) continue;
-    user.hidden.preference[k] = blendTrait(user.hidden.preference[k] || { value: 0.5, confidence: 0 }, t.value, 0.12);
+    const cur = user.hidden.preference[k] || { value: 0.5, confidence: 0 };
+    const next = blendTrait(cur, t.value, 0.12);
+    user.hidden.preference[k] = { value: next.value, confidence: Math.max(cur.confidence, Math.min(LIKE_CAP, next.confidence)) };
   }
 }
 

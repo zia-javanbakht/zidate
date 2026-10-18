@@ -1,5 +1,5 @@
 // The weekly two: see them, decide, widen the search, report.
-import { weeklyPicks, compatibility, currentWeek, available } from '../matching.js';
+import { weeklyPicks, compatibility, currentWeek, available, fillWeek, canWiden, PER_WEEK } from '../matching.js';
 import { queueEvent, askNow } from '../agent/index.js';
 import { TRAIT_KEYS } from '../traits.js';
 import { normalizeCity } from '../cities.js';
@@ -13,19 +13,23 @@ export default function week(ctx) {
 
   route('GET', '/api/week', async ({ user }) => ({ body: weeklyPicks(store, user) }));
 
-  // An empty or short week: widen the age range and look again.
+  // A short week: look further (more age range, and lift limits learned from passes),
+  // then top the week up. People already in it, and decisions already made, stay.
   route('POST', '/api/week/widen', async ({ user }) => {
+    const wk = weeklyPicks(store, user);
+    if (!wk.ready || wk.paused) throw new HttpError(409, 'There is nothing to widen yet.');
+    const week = store.data.weeks[`${user.id}:${currentWeek(user)}`];
+    if (week.picks.length >= PER_WEEK || !canWiden(user)) throw new HttpError(409, 'This week is already full.');
     const steps = [3, 5, 8, 10, 15, 20];
     const cur = user.basics.ageRange ?? 8;
-    const next = steps.find((s) => s > cur) ?? cur;
-    user.basics.ageRange = next;
-    // Widening also lifts age limits learned from passes.
-    if (user.hidden.limits) for (const k of ['ageMin', 'ageMax']) delete user.hidden.limits[k];
-    const key = `${user.id}:${currentWeek(user)}`;
-    const wk = store.data.weeks[key];
-    // Keep decisions already made; only refill when the week had room.
-    if (wk && wk.picks.every((p) => !p.decision)) delete store.data.weeks[key];
-    return { body: { ageRange: next, ...weeklyPicks(store, user) } };
+    user.basics.ageRange = steps.find((s) => s > cur) ?? cur;
+    const lifted = [];
+    const l = (user.hidden.limits ||= {});
+    if (l.localOnly) lifted.push('city');
+    if (l.ageMin != null || l.ageMax != null) lifted.push('age');
+    for (const k of ['localOnly', 'ageMin', 'ageMax']) delete l[k];
+    const added = fillWeek(store, user, week);
+    return { body: { ageRange: user.basics.ageRange, lifted, added, ...weeklyPicks(store, user) } };
   });
 
   route('POST', '/api/week/:id', async ({ user, params, body }) => {
