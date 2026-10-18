@@ -135,7 +135,7 @@ export function about() {
     p('The hidden profile is how I choose people for you: personality, values, dealbreakers and what you want in a partner. Only you can see it, under You, and you can correct anything that is wrong.'),
     p('I also learn from what you do: who you like and pass on, how conversations with matches go, and when you are usually around. These signals are only used to choose people for you. They are not shown in the app, and they are included when you download your data.'),
     h('h2', {}, 'Two people a week'),
-    p('Every Monday you get two suggestions, people in your city first. Like or pass, and tell me why: it makes the next pair better. When you both like each other, you can talk.'),
+    p('Every Monday you get two suggestions, people near you first, and only as far away as you are both happy to go. Like or pass, and tell me why: it makes the next pair better. When you both like each other, you can talk.'),
     h('h2', {}, 'Privacy and safety'),
     p('Photos can stay hidden until you match. Messages that look abusive are not sent. You can report or unmatch anyone, pause whenever you like, download all your data, and delete your account at any time. Deleting removes everything, including photos and conversations.')));
 }

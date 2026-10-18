@@ -69,3 +69,49 @@ test('basics cannot be skipped', async () => {
   const msg = await respond(u, convo, 'skip', mockEngine);
   assert.match(msg.text, /city/i);
 });
+
+test('the matchmaker asks how far they would go, early, and remembers the answer', async () => {
+  const u = user();
+  const convo = newConversation();
+  const order = [];
+  for (let i = 0; i < 4; i++) {
+    const q = nextQuestion(u, convo);
+    convo.asked.push(q.id);
+    order.push(q.id);
+  }
+  assert.equal(order[2], 'q_distance', order.join());
+  // Tapping a quick reply sets it.
+  const v = user();
+  const c2 = newConversation();
+  const { QUESTIONS } = await import('../../src/agent/questions.js');
+  const q = QUESTIONS.find((x) => x.id === 'q_distance');
+  for (const [label, want] of [['Only someone near me', 'near'], ['Up to a few hours away', 'hours'], ['Distance is no problem', 'any']]) {
+    c2.pending = { id: q.id, kind: 'interview', mode: 'self', choices: q.choices };
+    await respond(v, c2, label, mockEngine);
+    assert.equal(v.basics.distance, want, label);
+  }
+});
+
+test('a typed answer to the distance question is understood too', async () => {
+  const { parseDistance } = await import('../../src/agent/index.js');
+  assert.equal(parseDistance('No, I want someone in my city'), 'near');
+  assert.equal(parseDistance('Yes, distance is no problem'), 'any');
+  assert.equal(parseDistance('Maybe a couple of hours by train'), 'hours');
+  assert.equal(parseDistance('hmm'), null);
+  const u = user();
+  const convo = newConversation();
+  convo.pending = { id: 'q_distance', kind: 'interview', mode: 'self' };
+  await respond(u, convo, 'I would rather keep it local', mockEngine);
+  assert.equal(u.basics.distance, 'near');
+});
+
+test('the distance question is skipped once it is set in settings', () => {
+  const u = user();
+  u.basics.distance = 'any';
+  const convo = newConversation();
+  for (let i = 0; i < 12; i++) {
+    const q = nextQuestion(u, convo);
+    assert.notEqual(q.id, 'q_distance');
+    convo.asked.push(q.id);
+  }
+});

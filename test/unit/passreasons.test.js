@@ -4,6 +4,7 @@ import { Store } from '../../src/db.js';
 import { seedDemo } from '../../src/seed.js';
 import { newUser } from '../../src/app.js';
 import { weeklyPicks, eligible } from '../../src/matching.js';
+import { nearby } from '../../src/cities.js';
 import { respond, opening } from '../../src/agent/index.js';
 import { mockEngine } from '../../src/agent/mock.js';
 import { feedbackQuestion } from '../../src/agent/questions.js';
@@ -88,7 +89,7 @@ test('"no spark" follows up with what does spark it, which shapes preferences', 
   assert.ok(u.hidden.preference.humour.value > 0.6);
 });
 
-test('"too far away" keeps future suggestions in their city', async () => {
+test('"too far away" keeps future suggestions near them', async () => {
   clock.reset();
   const store = new Store(null);
   seedDemo(store, { count: 200 });
@@ -98,7 +99,7 @@ test('"too far away" keeps future suggestions in their city', async () => {
   await respond(u, convo, 'Too far away', mockEngine);
   assert.equal(u.hidden.limits.localOnly, true);
   for (let w = 0; w < 3; w++) {
-    for (const p of weeklyPicks(store, u).picks) assert.equal(p.city, 'London');
+    for (const p of weeklyPicks(store, u).picks) assert.ok(nearby(p.city, 'London'), p.city);
     clock.advance(7 * 864e5);
   }
   clock.reset();

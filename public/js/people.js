@@ -116,7 +116,7 @@ export async function week() {
       widen.disabled = true;
       try {
         const res = await api('POST', '/api/week/widen');
-        const also = res.lifted?.includes('city') ? ', and beyond your city' : '';
+        const also = res.lifted?.includes('city') ? ', and beyond your area' : '';
         toast(res.added ? `Found ${res.added === 1 ? 'someone' : `${res.added} people`} within ${res.ageRange} years of you${also}.` : `Now looking within ${res.ageRange} years of you${also}. No one new yet.`);
         week();
       } catch (ex) {

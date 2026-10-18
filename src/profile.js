@@ -206,7 +206,7 @@ export function describeHidden(user) {
 // Search limits learned from passes, in plain words. Each one can be removed.
 export function describeLimits(l) {
   const out = [];
-  if (l.localOnly) out.push({ key: 'localOnly', text: 'Only people in your city' });
+  if (l.localOnly) out.push({ key: 'localOnly', text: 'Only people near you' });
   if (l.ageMin != null && l.ageMax != null) out.push({ key: 'age', text: `Ages ${l.ageMin} to ${l.ageMax}` });
   else if (l.ageMin != null) out.push({ key: 'age', text: `Older than ${l.ageMin - 1}` });
   else if (l.ageMax != null) out.push({ key: 'age', text: `Younger than ${l.ageMax + 1}` });

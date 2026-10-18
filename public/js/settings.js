@@ -28,17 +28,22 @@ export async function settings() {
     seeking: field({ id: 's-seeking', label: 'I want to meet', type: 'select', value: b.seeking || 'everyone', options: [['women', 'women'], ['men', 'men'], ['everyone', 'everyone']] }),
     ageRange: field({ id: 's-range', label: 'Age range', type: 'select', value: String(b.ageRange ?? 8), options: [3, 5, 8, 10, 15, 20].map((n) => [String(n), `within ${n} years`]) }),
     city: field({ id: 's-city', label: 'City', value: b.city || '', maxlength: 50, autocomplete: 'address-level2' }),
+    distance: field({ id: 's-distance', label: 'How far would you go?', type: 'select', value: b.distance || '', options: [
+      ...(b.distance ? [] : [['', 'not chosen yet']]),
+      ['near', 'only someone near me'], ['hours', 'up to a few hours away'], ['any', 'distance is no problem'],
+    ] }),
   };
   const basicsForm = h('form', { class: 'stack', novalidate: true },
     f.name.node,
     h('div', { class: 'field-row' }, f.age.node, f.city.node),
     h('div', { class: 'field-row' }, f.gender.node, f.seeking.node),
-    f.ageRange.node,
+    h('div', { class: 'field-row' }, f.ageRange.node, f.distance.node),
     h('div', {}, h('button', { class: 'btn small', type: 'submit' }, 'Save basics')));
   basicsForm.onsubmit = async (e) => {
     e.preventDefault();
     const basics = { name: f.name.input.value, city: f.city.input.value, gender: f.gender.input.value, seeking: f.seeking.input.value, ageRange: Number(f.ageRange.input.value) };
     if (f.age.input.value) basics.age = Number(f.age.input.value);
+    if (f.distance.input.value) basics.distance = f.distance.input.value;
     if (await save({ basics })) settings();
   };
 

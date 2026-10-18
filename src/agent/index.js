@@ -53,7 +53,18 @@ const BASIC_HINT = {
   city: 'I need your city to suggest people near you. Just the name is perfect.',
 };
 
+// A free-text answer to the distance question, for people who type instead of tapping.
+export function parseDistance(text) {
+  const t = text.toLowerCase();
+  if (/no problem|anywhere|don'?t mind|doesn'?t matter|long[- ]distance is (fine|ok)|^(yes|yeah|sure)\b|open to/.test(t)) return 'any';
+  if (/hour|drive|train|weekend|not too far/.test(t)) return 'hours';
+  if (/near|close|same city|local|my (city|area|town)|^no\b|^nope|not really/.test(t)) return 'near';
+  return null;
+}
+
 function questionScore(q, user, answeredSelf, lastHadChoices) {
+  // Early questions come third: after a couple of easy ones, before the deep ones.
+  if (q.early) return answeredSelf >= 2 ? 5 : -1;
   if (q.mode === 'partner' && answeredSelf < 4) return -1;
   const conf = q.traits.map((k) => user.hidden.traits[k].confidence);
   const need = conf.length ? conf.reduce((a, c) => a + (1 - c), 0) / conf.length : 0.5;
@@ -74,7 +85,7 @@ export function nextQuestion(user, convo) {
   const answeredSelf = convo.asked.filter((id) => QUESTIONS.find((q) => q.id === id)?.mode === 'self').length;
   const lastId = [...convo.asked].reverse().find((id) => QUESTIONS.some((q) => q.id === id) || DEEPER.some((q) => q.id === id));
   const lastHadChoices = Boolean([...QUESTIONS, ...DEEPER].find((q) => q.id === lastId)?.choices);
-  const open = QUESTIONS.filter((q) => !convo.asked.includes(q.id))
+  const open = QUESTIONS.filter((q) => !convo.asked.includes(q.id) && !q.skipIf?.(user))
     .map((q) => [q, questionScore(q, user, answeredSelf, lastHadChoices)])
     .filter(([, s]) => s >= 0)
     .sort((a, b) => b[1] - a[1]);
@@ -159,6 +170,9 @@ export async function respond(user, convo, rawText, engine = pickEngine(), signa
     Object.assign(user.basics, choice.basics || {});
     applyPassChoice(user, convo, pending, choice);
     choiceApplied = true;
+  } else if (pending?.id === 'q_distance') {
+    const distance = parseDistance(text);
+    if (distance) user.basics.distance = distance;
   }
 
   const next = nextQuestion(user, convo);
