@@ -43,7 +43,7 @@ export function newUser(store, { name, email, password }) {
     createdAt: now().toISOString(),
     basics: { gender: null, seeking: null, age: null, city: null, distance: null },
     hidden: emptyHidden(),
-    shared: { bio: '', bioDraft: '', interests: [], items: [], facts: {} },
+    shared: { bio: '', bioDraft: '', interests: [], items: [], facts: {}, openers: [] },
     photos: [],
   };
   settingsOf(user);

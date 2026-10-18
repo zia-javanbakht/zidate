@@ -115,6 +115,30 @@ export async function profile(section = '') {
     reload();
   });
 
+  // --- opening questions ---
+  const openers = shared.openers || [];
+  const saveOpeners = (list) => act(async () => { await api('PUT', '/api/profile/openers', { openers: list }); reload(); });
+  const addOpener = act(async () => {
+    const v = await ask({
+      title: 'Add an opening question',
+      text: 'Matches can answer it to start the conversation.',
+      fields: [
+        { name: 'pick', label: 'Pick one', type: 'select', options: [['', 'Write my own below'], ...data.openers.filter((o) => !openers.includes(o))] },
+        { name: 'own', label: 'Or your own question', maxlength: 120 },
+      ],
+      confirm: 'Add',
+      validate: (x) => (x.pick || x.own.trim() ? '' : 'Pick a question or write one.'),
+    });
+    if (!v) return;
+    await saveOpeners([...openers, v.own.trim() || v.pick])();
+  });
+  const openersBlock = h('div', { class: 'item', id: 'openers' },
+    h('div', { class: 'prompt' }, 'Opening questions'),
+    openers.length
+      ? h('ul', { class: 'plain' }, openers.map((q, i) => h('li', {}, q, ' ', h('button', { class: 'link small', type: 'button', 'aria-label': `Remove: ${q}`, onclick: saveOpeners(openers.filter((_, j) => j !== i)) }, 'Remove'))))
+      : h('p', { class: 'text muted' }, 'Up to three questions a match can answer, so nobody has to think of a first line.'),
+    openers.length < 3 ? h('div', { class: 'row' }, h('button', { class: 'btn small ghost', type: 'button', onclick: addOpener }, '+ Add a question')) : null);
+
   const addInterest = act(async () => {
     const left = data.interests.filter((i) => !shared.interests.includes(i));
     const v = await ask({ title: 'Add an interest', fields: [{ name: 'name', label: 'Interest', type: 'select', options: left }], confirm: 'Add' });
@@ -170,6 +194,7 @@ export async function profile(section = '') {
     factsBlock,
     h('div', { id: 'lines', class: 'stack' }, ...itemNodes),
     h('div', { class: 'item' }, h('button', { class: 'btn small ghost', onclick: addLine }, '+ Add a line of my own')),
+    openersBlock,
     h('div', { class: 'item', id: 'interests' }, h('div', { class: 'prompt' }, 'Interests'),
       shared.suggestedInterests?.length ? h('div', { class: 'stack' },
         h('p', { class: 'small muted' }, `You mentioned ${shared.suggestedInterests.join(', ')}. Show ${shared.suggestedInterests.length > 1 ? 'them' : 'it'} on your profile?`),

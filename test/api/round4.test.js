@@ -304,3 +304,16 @@ test('first-date ideas appear once both have talked a little, built from shared 
   assert.match(ideas[0].message, /^How about an old film/);
   await s.close();
 });
+
+test('opening questions: shown on the card and offered first to a match', async () => {
+  const { s, a, b, mid } = await matched();
+  assert.equal((await b.put('/api/profile/openers', { openers: ['a?', 'b?', 'c?', 'd?'] })).status, 400);
+  assert.equal((await b.put('/api/profile/openers', { openers: ['Find me on insta @benny'] })).status, 400);
+  const r = await b.put('/api/profile/openers', { openers: ['What is the best thing you ate this week?', 'What is the best thing you ate this week?', 'Two truths and a lie: go.'] });
+  assert.deepEqual(r.data.openers, ['What is the best thing you ate this week?', 'Two truths and a lie: go.']);
+  const t = (await a.get(`/api/matches/${mid}`)).data;
+  assert.deepEqual(t.person.openers, r.data.openers);
+  assert.equal(t.icebreakers[0], 'You asked: What is the best thing you ate this week? ');
+  assert.ok(t.icebreakers.length >= 3);
+  await s.close();
+});

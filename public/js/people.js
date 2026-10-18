@@ -88,6 +88,7 @@ export function personCard(p, { onDecide, onReport } = {}) {
     p.reason ? h('p', { class: 'why' }, p.reason) : null,
     p.facts?.length ? h('ul', { class: 'facts', 'aria-label': 'About' }, p.facts.map((f) => h('li', {}, h('span', {}, `${f.label}:`), f.value))) : null,
     p.interests?.length ? h('ul', { class: 'tags', 'aria-label': 'Interests' }, p.interests.map((i) => h('li', {}, i))) : null,
+    p.openers?.length ? h('div', { class: 'openers' }, h('div', { class: 'prompt' }, `${p.name} would love to be asked`), h('ul', {}, p.openers.map((q) => h('li', {}, q)))) : null,
     p.items?.length ? h('dl', { class: 'qa' }, p.items.flatMap((i, index) => [h('dt', {}, i.prompt || 'About me'),
       h('dd', {}, i.text, open ? heart(`Like this line: ${i.prompt || 'About me'}`, { kind: 'item', index }, 'line') : null)])) : null);
   if (p.likedYou) {

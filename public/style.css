@@ -344,3 +344,6 @@ blockquote.about img { width: 120px; aspect-ratio: 4 / 5; object-fit: cover; bor
 .ideas summary { cursor: pointer; color: var(--accent); }
 .ideas ul { margin: 6px 0 0; padding-left: 18px; }
 .ideas .link { text-align: left; }
+.openers { margin-top: 14px; }
+.openers .prompt { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.openers ul, ul.plain { margin: 4px 0 0; padding-left: 18px; }

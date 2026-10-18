@@ -67,14 +67,15 @@ export function demoReply(demo, user, thread) {
 
 // Conversation starters built only from what both people chose to share.
 export function icebreakers(me, other) {
-  const out = [];
+  // Their own opening questions come first: they asked to be asked.
+  const out = (other.shared.openers || []).map((q) => `You asked: ${q} `);
   const common = me.shared.interests.filter((i) => other.shared.interests.includes(i));
   if (common[0]) out.push(`You both like ${common[0]}. What got you into it?`);
   const item = other.shared.items.find((i) => i.status === 'approved');
   if (item) out.push(`About “${item.prompt || 'your profile'}”: ${item.text.length > 70 ? `${item.text.slice(0, 67)}…` : item.text} Tell me more?`);
   if (other.shared.interests[0] && !common.includes(other.shared.interests[0])) out.push(`I have never really tried ${other.shared.interests[0]}. Where would I start?`);
   out.push('What does a good week look like for you?');
-  return out.slice(0, 3);
+  return [...new Set(out)].slice(0, Math.max(3, (other.shared.openers || []).length + 1));
 }
 
 // A week after matching, the matchmaker asks whether they met. Anyone still talking then
