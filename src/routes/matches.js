@@ -67,7 +67,8 @@ export default function matches(ctx) {
         person: other ? publicProfile(other, { showPhotos: true }) : null,
         messages: msgs.map((x) => view(x, user)),
         seenByThem: other ? m.seen?.[other.id] || null : null,
-        icebreakers: msgs.length || !other ? [] : icebreakers(user, other),
+        // Ways to start, until you have written something yourself (a note with a like may open it).
+        icebreakers: msgs.some((x) => x.from === user.id) || !other ? [] : icebreakers(user, other),
         met: m.met?.[user.id]?.answer || null,
         // Once you have talked a little, some first-date ideas from what you both like.
         dateIdeas: other && !m.closed && msgs.filter((x) => x.from === user.id).length >= 2 && msgs.filter((x) => x.from === other.id).length >= 2 ? dateIdeas(user, other) : [],
