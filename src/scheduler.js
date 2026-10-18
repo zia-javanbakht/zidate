@@ -1,9 +1,10 @@
 // Background jobs, run on start and then every hour:
-// weekly picks (+ "your two are here"), match check-ins, and data backups.
+// weekly picks (+ "your two are here"), match check-ins, reminders, and data backups.
 import fs from 'node:fs';
 import path from 'node:path';
 import { runWeekly } from './matching.js';
 import { runCheckins } from './social.js';
+import { runNudges } from './turns.js';
 
 export function backup(file, { keep = 7, dir = null } = {}) {
   if (!file || !fs.existsSync(file)) return null;
@@ -20,9 +21,10 @@ export function backup(file, { keep = 7, dir = null } = {}) {
 export function tick(store, ctx) {
   const picks = runWeekly(store, ctx.notify);
   const checkins = runCheckins(ctx);
+  const nudges = runNudges(ctx);
   store.pruneSessions();
-  if (picks || checkins) store.save();
-  return { picks, checkins, backup: backup(store.file) };
+  if (picks || checkins || nudges) store.save();
+  return { picks, checkins, nudges, backup: backup(store.file) };
 }
 
 export function startScheduler(store, ctx, everyMs = 3600e3) {

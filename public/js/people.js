@@ -131,6 +131,13 @@ export async function week() {
       resume));
     return;
   }
+  if (data.held) {
+    render(empty(
+      h('h2', {}, 'Your two are waiting.'),
+      h('p', { class: 'muted' }, 'Before I introduce anyone new, answer the people already waiting on you, or close those conversations kindly. Nobody here gets left on read.'),
+      h('ul', { class: 'list' }, data.owed.map((o) => h('li', {}, h('a', { href: `#/match/${encodeURIComponent(o.matchId)}` }, h('span', { class: 'name' }, `Reply to ${o.name}`), h('span', { class: 'when' }, '→')))))));
+    return;
+  }
   if (!data.ready) {
     render(empty(
       h('h2', {}, 'Not yet.'),
@@ -233,10 +240,10 @@ export async function matches() {
         h('div', { class: 'who' }, avatar(m.person),
           h('div', { style: 'min-width:0' },
             h('div', { class: 'name' }, m.person.name),
-            h('div', { class: 'preview' }, m.last ? `${m.last.mine ? 'You: ' : ''}${m.last.text}` : 'Say hello'))),
+            h('div', { class: 'preview' }, m.closed ? 'Closed' : m.last ? `${m.last.mine ? 'You: ' : ''}${m.last.text}` : 'Say hello'))),
         h('div', { class: 'stack', style: 'text-align:right' },
           h('div', { class: 'when' }, ago(m.last?.at || m.createdAt)),
-          m.unread ? h('span', { class: 'badge' }, String(m.unread)) : m.isNew ? h('span', { class: 'badge' }, 'New') : null)))))));
+          m.unread ? h('span', { class: 'badge' }, String(m.unread)) : m.isNew ? h('span', { class: 'badge' }, 'New') : m.yourTurn ? h('span', { class: 'turn small' }, 'Your turn') : null)))))));
   // A new message elsewhere refreshes the list.
   live.on('message', () => matches());
 }
@@ -257,6 +264,7 @@ export async function thread(id) {
     log.querySelector('.hello')?.remove();
     if (m.about) log.append(h('div', { class: `liked ${m.mine ? 'user' : 'them'}` }, h('span', { class: 'small muted' }, m.mine ? 'You liked' : `${name} liked`), quote(m.about, m.mine ? `${name}'s photo` : 'Your photo')));
     log.append(h('p', { class: `msg ${m.mine ? 'user' : 'them'}` }, m.text, h('time', { datetime: m.at }, clock(m.at))));
+    if (m.closing) log.append(h('p', { class: 'muted small center closed-note' }, m.mine ? 'You closed this conversation.' : `${name} closed this conversation kindly.`));
     if (m.mine) lastMineAt = m.at;
     showSeen();
   };
@@ -330,6 +338,28 @@ export async function thread(id) {
     }
   };
 
+  // Close kindly: a last message, so nobody is left wondering. The thread stays readable.
+  const closeBtn = data.closed ? null : h('button', { class: 'link small', type: 'button' }, 'Close kindly');
+  if (closeBtn) closeBtn.onclick = async () => {
+    const v = await ask({
+      title: `Close your conversation with ${name}?`,
+      text: 'I will send one last message for you. You can pick one of these or write your own.',
+      fields: [
+        { name: 'line', label: 'Message', type: 'select', options: data.closeLines.map((l, i) => [String(i), l]) },
+        { name: 'text', label: 'Or in your own words (optional)', type: 'textarea', maxlength: 300 },
+      ],
+      confirm: 'Send and close',
+    });
+    if (!v) return;
+    try {
+      await api('POST', `/api/matches/${encodeURIComponent(id)}/close`, { line: Number(v.line), text: v.text });
+      toast(`Closed. Thank you for letting ${name} know.`);
+      thread(id);
+    } catch (ex) {
+      toast(ex.message);
+    }
+  };
+
   const unmatch = h('button', { class: 'link small', type: 'button' }, 'Unmatch or report');
   unmatch.onclick = async () => {
     const v = await ask({
@@ -349,7 +379,7 @@ export async function thread(id) {
     location.hash = '#/matches';
   };
   render(h('section', { class: 'chat' },
-    h('div', { class: 'section-head' }, h('a', { class: 'back', href: '#/matches' }, '← Matches'), h('div', { class: 'row wrap' }, metBtn, unmatch)),
-    personCard(data.person), log, ice, form));
+    h('div', { class: 'section-head' }, h('a', { class: 'back', href: '#/matches' }, '← Matches'), h('div', { class: 'row wrap' }, metBtn, closeBtn, unmatch)),
+    personCard(data.person), log, data.closed ? null : ice, data.closed ? null : form));
   window.scrollTo(0, document.body.scrollHeight);
 }

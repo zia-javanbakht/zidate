@@ -117,3 +117,70 @@ test('"once was enough" from the conversation: the matchmaker asks why, and "not
   assert.equal(Object.values(s.store.data.signals[B.id].dateReviews)[0].reason, 'unsafe');
   await s.close();
 });
+
+test('close a conversation kindly: a last message, then the thread is read-only and nobody is blocked', async () => {
+  const { s, a, b, A, B, mid } = await matched();
+  await b.post(`/api/matches/${mid}`, { text: 'Hey Ana, how is your week?' });
+  const r = await a.post(`/api/matches/${mid}/close`, { line: 1 });
+  assert.equal(r.status, 200);
+  assert.match(r.data.message.text, /not feel this is going anywhere/);
+  assert.equal(r.data.message.closing, true);
+  assert.equal((await a.post(`/api/matches/${mid}/close`, {})).status, 409);
+  assert.equal((await b.post(`/api/matches/${mid}`, { text: 'Oh. Okay.' })).status, 409);
+  const seen = (await b.get(`/api/matches/${mid}`)).data;
+  assert.deepEqual([seen.closed.byMe, seen.messages.at(-1).closing], [false, true]);
+  assert.ok(s.store.data.notifications[B.id].some((n) => /closed your conversation kindly/.test(n.text)));
+  const list = (await a.get('/api/matches')).data.matches;
+  assert.equal(list[0].closed, true);
+  assert.equal(s.store.data.blocks[`${A.id}>${B.id}`], undefined);
+  // Hurtful closings are refused like any message.
+  const t = await matched();
+  assert.equal((await t.a.post(`/api/matches/${t.mid}/close`, { text: 'Bye, ugly cow' })).status, 422);
+  await s.close();
+  await t.s.close();
+});
+
+test('your turn: next week waits for the people waiting on you, and a reply releases it', async () => {
+  const { s, a, b, A, mid } = await matched();
+  await b.post(`/api/matches/${mid}`, { text: 'Hi Ana, fancy a coffee this week?' });
+  // Next week, two days later or more.
+  clock.advance(7 * 864e5);
+  let wk = (await a.get('/api/week')).data;
+  assert.equal(wk.held, true);
+  assert.deepEqual(wk.owed.map((o) => o.name), ['Ben']);
+  assert.equal((await a.post('/api/week/widen')).status, 409);
+  // Ben is not held: it is Ana's turn, not his.
+  assert.notEqual((await b.get('/api/week')).data.held, true);
+  // The weekly job says why, once.
+  tick(s.store, s.ctx);
+  tick(s.store, s.ctx);
+  const held = s.store.data.notifications[A.id].filter((n) => /waiting\. Answer Ben first/.test(n.text));
+  assert.equal(held.length, 1);
+  await a.post(`/api/matches/${mid}`, { text: 'Yes! Thursday?' });
+  wk = (await a.get('/api/week')).data;
+  assert.equal(wk.held, undefined);
+  assert.equal(wk.ready, true);
+  clock.reset();
+  await s.close();
+});
+
+test('closing kindly also releases the week, and reminders go out once per waiting message', async () => {
+  const { s, a, b, A, B, mid } = await matched();
+  clock.advance(4 * 864e5);
+  tick(s.store, s.ctx);
+  const hello = (id) => s.store.data.notifications[id].filter((n) => /Say hello/.test(n.text)).length;
+  assert.deepEqual([hello(A.id), hello(B.id)], [1, 1]);
+  tick(s.store, s.ctx);
+  assert.deepEqual([hello(A.id), hello(B.id)], [1, 1], 'only once');
+  await b.post(`/api/matches/${mid}`, { text: 'Hi Ana!' });
+  clock.advance(4 * 864e5);
+  tick(s.store, s.ctx);
+  tick(s.store, s.ctx);
+  const waiting = s.store.data.notifications[A.id].filter((n) => /Ben is waiting for your reply/.test(n.text));
+  assert.equal(waiting.length, 1);
+  assert.equal((await a.get('/api/week')).data.held, true);
+  await a.post(`/api/matches/${mid}/close`, {});
+  assert.notEqual((await a.get('/api/week')).data.held, true);
+  clock.reset();
+  await s.close();
+});

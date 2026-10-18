@@ -87,7 +87,7 @@ export function runCheckins(ctx) {
   for (const m of Object.values(store.data.matches)) {
     const first = !m.checkin && Date.parse(m.createdAt) <= cutoff;
     const again = Boolean(m.checkin && m.askAgainAt && !m.askedAgain && Date.parse(m.askAgainAt) <= t);
-    if (!first && !again) continue;
+    if ((!first && !again) || m.closed) continue;
     if (first) m.checkin = now().toISOString();
     else m.askedAgain = now().toISOString();
     const [a, b] = m.users.map((id) => store.data.users[id]);

@@ -5,6 +5,7 @@ import { isReady, publicProfile, settingsOf } from './profile.js';
 import { distanceKm, NEARBY_KM, FEW_HOURS_KM } from './cities.js';
 import { weekKey, nextWeekStart, now } from './clock.js';
 import { dateRating, photoMismatches } from './dates.js';
+import { waitingOn } from './turns.js';
 import { revealedPreferences, likeChance, responsiveness, popularity, hoursOverlap, noteShown, reportCounts } from './signals.js';
 
 export const PER_WEEK = 2;
@@ -297,6 +298,9 @@ export function weeklyPicks(store, user) {
         : ['a few basics (who you are looking for, your age and city)'];
       return { week: wk, ready: false, missing, picks: [], next: nextAt };
     }
+    // The next two wait until the people already waiting on this person get an answer.
+    const owed = waitingOn(store, user);
+    if (owed.length) return { week: wk, ready: true, held: true, owed: owed.map(({ matchId: id, name }) => ({ matchId: id, name })), picks: [], next: nextAt };
     week = { createdAt: now().toISOString(), picks: [] };
     store.data.weeks[key] = week;
     fillWeek(store, user, week);
@@ -341,6 +345,15 @@ export function runWeekly(store, notify) {
     const key = `${u.id}:${currentWeek(u)}`;
     if (store.data.weeks[key]) continue;
     const res = weeklyPicks(store, u);
+    if (res.held) {
+      // Once per week: say what the two are waiting for.
+      store.data.held ||= {};
+      if (store.data.held[key]) continue;
+      store.data.held[key] = now().toISOString();
+      const names = res.owed.map((o) => o.name);
+      notify?.(u, { type: 'picks', text: `Your two for this week are waiting. Answer ${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]} first, or close it kindly.`, link: '#/week' });
+      continue;
+    }
     if (res.picks.length) {
       made++;
       notify?.(u, { type: 'picks', text: 'Your two people for this week are here.', link: '#/week' });

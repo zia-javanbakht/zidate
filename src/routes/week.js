@@ -17,7 +17,7 @@ export default function week(ctx) {
   // then top the week up. People already in it, and decisions already made, stay.
   route('POST', '/api/week/widen', async ({ user }) => serial(user.id, async () => {
     const wk = weeklyPicks(store, user);
-    if (!wk.ready || wk.paused) throw new HttpError(409, 'There is nothing to widen yet.');
+    if (!wk.ready || wk.paused || wk.held) throw new HttpError(409, 'There is nothing to widen yet.');
     const week = store.data.weeks[`${user.id}:${currentWeek(user)}`];
     if (week.picks.length >= PER_WEEK || !canWiden(user)) throw new HttpError(409, 'This week is already full.');
     const steps = [3, 5, 8, 10, 15, 20];

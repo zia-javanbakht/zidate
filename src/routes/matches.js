@@ -2,6 +2,7 @@
 import { publicProfile, cleanText } from '../profile.js';
 import { demoReply, icebreakers, passEvent } from '../social.js';
 import { recordMet, MET } from '../dates.js';
+import { CLOSE_LINES } from '../turns.js';
 import { askNow } from '../agent/index.js';
 import { screenMessage } from '../moderation.js';
 import { now } from '../clock.js';
@@ -17,7 +18,7 @@ export default function matches(ctx) {
   }
   const otherOf = (m, user) => store.data.users[m.users.find((u) => u !== user.id)];
   const view = (x, user) => ({
-    text: x.text, at: x.at, mine: x.from === user.id,
+    text: x.text, at: x.at, mine: x.from === user.id, ...(x.closing ? { closing: true } : {}),
     // A like on one line or photo opens the conversation, quoted above the note.
     ...(x.about ? { about: x.about.kind === 'photo' ? { photo: `/api/photos/${x.about.photoId}` } : { prompt: x.about.prompt, text: x.about.text } } : {}),
   });
@@ -37,6 +38,8 @@ export default function matches(ctx) {
           last: last ? { text: last.text, mine: last.from === user.id, at: last.at } : null,
           unread: msgs.filter((x) => x.from !== user.id && x.at > seen).length,
           isNew: !seen,
+          closed: Boolean(m.closed),
+          yourTurn: !m.closed && last?.from === other?.id,
         };
       })
       .filter((m) => m.person)
@@ -64,12 +67,15 @@ export default function matches(ctx) {
         seenByThem: other ? m.seen?.[other.id] || null : null,
         icebreakers: msgs.length || !other ? [] : icebreakers(user, other),
         met: m.met?.[user.id]?.answer || null,
+        closed: m.closed ? { byMe: m.closed.by === user.id, at: m.closed.at } : null,
+        closeLines: CLOSE_LINES,
       },
     };
   }, { saves: true });
 
   route('POST', '/api/matches/:id', async ({ user, params, body }) => {
     const m = getMatch(user, params.id);
+    if (m.closed) throw new HttpError(409, 'This conversation is closed.');
     const text = cleanText(body.text, 1000);
     if (!text) throw new HttpError(400, 'Say something first.');
     const other = otherOf(m, user);
@@ -96,6 +102,27 @@ export default function matches(ctx) {
       reply = view(r, user);
     }
     return { status: 201, body: { message: view(msg, user), reply } };
+  });
+
+  // Close a conversation kindly: a last message (one of ours, or your own words), then the
+  // thread stays readable but quiet. Nobody is left waiting, and nobody is blocked.
+  route('POST', '/api/matches/:id/close', async ({ user, params, body }) => {
+    const m = getMatch(user, params.id);
+    if (m.closed) throw new HttpError(409, 'This conversation is already closed.');
+    const text = cleanText(body.text, 300) || CLOSE_LINES[Number(body.line) || 0] || CLOSE_LINES[0];
+    const problem = screenMessage(store, user, text, { at: now().toISOString() });
+    if (problem) throw new HttpError(422, problem);
+    const msg = { from: user.id, text, at: now().toISOString(), closing: true };
+    store.data.messages[m.id].push(msg);
+    noteMessage(store, user, store.data.messages[m.id]);
+    m.closed = { by: user.id, at: msg.at };
+    m.seen = { ...m.seen, [user.id]: msg.at };
+    const other = otherOf(m, user);
+    if (other) {
+      hub.publish(other.id, 'message', { matchId: m.id, message: view(msg, other) });
+      notify(other, { type: 'message', text: `${user.name} closed your conversation kindly.`, link: `#/match/${encodeURIComponent(m.id)}` });
+    }
+    return { body: { message: view(msg, user) } };
   });
 
   // "Did you meet?" from the conversation itself, any time. "Once was enough" hands over to
