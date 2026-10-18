@@ -2,7 +2,7 @@
 // weekly picks (+ "your two are here"), match check-ins, reminders, and data backups.
 import fs from 'node:fs';
 import path from 'node:path';
-import { runWeekly } from './matching.js';
+import { runWeekly, runReminders } from './matching.js';
 import { runCheckins } from './social.js';
 import { runNudges } from './turns.js';
 
@@ -21,7 +21,7 @@ export function backup(file, { keep = 7, dir = null } = {}) {
 export function tick(store, ctx) {
   const picks = runWeekly(store, ctx.notify);
   const checkins = runCheckins(ctx);
-  const nudges = runNudges(ctx);
+  const nudges = runNudges(ctx) + runReminders(store, ctx.notify);
   store.pruneSessions();
   if (picks || checkins || nudges) store.save();
   return { picks, checkins, nudges, backup: backup(store.file) };

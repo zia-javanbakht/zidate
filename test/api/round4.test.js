@@ -184,3 +184,25 @@ test('closing kindly also releases the week, and reminders go out once per waiti
   clock.reset();
   await s.close();
 });
+
+test('the day before a week ends, people who have not decided get one reminder', async () => {
+  const { s, a, A } = await two();
+  const next = Date.parse((await a.get('/api/week')).data.next);
+  tick(s.store, s.ctx);
+  const last = () => s.store.data.notifications[A.id]?.filter((n) => /Last day to decide on Ben/.test(n.text)).length || 0;
+  if (next - Date.now() > 864e5) {
+    assert.equal(last(), 0, 'not yet');
+    clock.advance(next - Date.now() - 12 * 3600e3);
+  }
+  tick(s.store, s.ctx);
+  tick(s.store, s.ctx);
+  assert.equal(last(), 1);
+  // Someone who decided is not reminded.
+  const t = await two();
+  await t.b.post(`/api/week/${t.A.id}`, { decision: 'pass' });
+  tick(t.s.store, t.s.ctx);
+  assert.ok(!(t.s.store.data.notifications[t.B.id] || []).some((n) => /Last day/.test(n.text)));
+  clock.reset();
+  await s.close();
+  await t.s.close();
+});

@@ -361,3 +361,22 @@ export function runWeekly(store, notify) {
   }
   return made;
 }
+
+// The day before a week ends, remind anyone who has not decided on this week's people yet.
+// Undecided suggestions are not carried over, so this is the last chance.
+export function runReminders(store, notify) {
+  let n = 0;
+  const t = Date.parse(now().toISOString());
+  for (const u of Object.values(store.data.users)) {
+    if (u.demo || inactive(u)) continue;
+    const week = store.data.weeks[`${u.id}:${currentWeek(u)}`];
+    if (!week || week.reminded) continue;
+    const open = week.picks.filter((p) => !p.decision && available(store, u, store.data.users[p.id]));
+    if (!open.length || Date.parse(nextWeek(u).toISOString()) - t > 864e5) continue;
+    week.reminded = now().toISOString();
+    const names = open.map((p) => store.data.users[p.id].name);
+    notify?.(u, { type: 'picks', text: `Last day to decide on ${names.join(' and ')}. New people arrive tomorrow.`, link: '#/week' });
+    n++;
+  }
+  return n;
+}

@@ -213,7 +213,7 @@ export async function week() {
   render(h('div', { class: 'stack' },
     h('div', {}, h('h1', {}, 'This week'), h('p', { class: 'muted' }, done
       ? `That is this week done. Your next two arrive ${until(data.next)}. Talking more in the meantime makes them better.`
-      : data.picks.length === 1 ? `One person this week, chosen for you. Next suggestions ${until(data.next)}.` : `Two people, chosen for you. Next pair ${until(data.next)}.`)),
+      : `${data.picks.length === 1 ? 'One person this week, chosen for you.' : 'Two people, chosen for you.'} Decide before the next ${data.picks.length === 1 ? 'suggestions arrive' : 'pair arrives'} ${until(data.next)}: undecided suggestions go then.`)),
     h('div', { class: `picks ${data.picks.length > 1 ? 'two' : ''}` }, cards),
     widen ? h('div', { class: 'banner' }, h('span', {}, 'Only one person fit this week.'), widen) : null));
   main.className = 'wide';
@@ -300,6 +300,7 @@ export async function thread(id) {
 
   live.on('message', (ev) => {
     if (ev.matchId !== id) return;
+    if (ev.message.closing) return thread(id); // they closed it: show it read-only
     ice.remove();
     add(ev.message);
     api('GET', `/api/matches/${encodeURIComponent(id)}`).catch(() => {}); // marks it read, and tells them it was seen
