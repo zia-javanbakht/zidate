@@ -1,7 +1,7 @@
 // Applying what the interviewer learned to a person's two profiles.
 //   hidden: traits, tags, dealbreakers, private notes. Never leaves the server for anyone else.
 //   shared: what potential matches see. The agent only *suggests* items; the person approves them.
-import { TRAITS, TRAIT_KEYS, TAGS, INTERESTS, clamp01 } from './traits.js';
+import { TRAITS, TRAIT_KEYS, CORE_TRAITS, TAGS, INTERESTS, ASPECTS, FACTS, FACT_KEYS, TAG_FACTS, clamp01, upgradeHidden } from './traits.js';
 import { now } from './clock.js';
 
 const MAX_NOTES = 40;
@@ -31,7 +31,7 @@ function addUnique(list, items, allowed) {
 
 const CONFLICTS = [
   ['smoker', 'non-smoker'], ['drinks', 'sober'], ['wants-kids', 'no-kids'],
-  ['pets', 'no-pets'], ['long-term', 'casual'], ['night-owl', 'early-bird'],
+  ['pets', 'no-pets'], ['long-term', 'casual'], ['night-owl', 'early-bird'], ['wants-marriage', 'no-marriage'],
 ];
 
 function removeConflicting(tags, added) {
@@ -73,6 +73,9 @@ export function applyUpdate(user, update) {
   removeConflicting(hidden.tags, newTags);
   addUnique(hidden.tags, newTags, TAGS);
   addUnique(hidden.dealbreakers, update.dealbreakers, TAGS);
+  for (const [k, v] of Object.entries(update.aspects || {})) {
+    if (ASPECTS[k]?.[v]) hidden.aspects[k] = v;
+  }
   addUnique(hidden.values, update.values);
   hidden.values = hidden.values.slice(-12);
   if (update.privateNote) {
@@ -101,15 +104,45 @@ export function applyUpdate(user, update) {
     let dropped = 0;
     shared.items = shared.items.filter((i) => !(i.status === 'suggested' && dropped++ < extra));
   }
+  const facts = { ...update.facts };
+  for (const tag of newTags) if (TAG_FACTS[tag] && !facts[TAG_FACTS[tag][0]]) facts[TAG_FACTS[tag][0]] = TAG_FACTS[tag][1];
+  suggestFacts(user, facts);
   // The bio is also only a draft until the person accepts it.
   if (update.bio && !hasContactInfo(update.bio)) shared.bioDraft = cleanText(update.bio, 400);
+}
+
+// A fact's value, tidied, or null when it is not a valid one.
+export function cleanFact(key, value) {
+  const def = FACTS[key];
+  if (!def) return null;
+  const v = cleanText(value, 60);
+  if (!v) return null;
+  if (def.options) return def.options.find((o) => o.toLowerCase() === v.toLowerCase()) || null;
+  return hasContactInfo(v) ? null : v;
+}
+
+// Suggest facts for the shared profile. Never overrides one the person set or approved.
+export function suggestFacts(user, facts) {
+  user.shared.facts ||= {};
+  for (const [key, raw] of Object.entries(facts || {})) {
+    const value = cleanFact(key, raw);
+    const cur = user.shared.facts[key];
+    if (!value || (cur && cur.status !== 'suggested')) continue;
+    user.shared.facts[key] = { value, status: 'suggested' };
+  }
+}
+
+export function upgradeUser(user) {
+  upgradeHidden(user.hidden);
+  user.shared.facts ||= {};
+  return user;
 }
 
 // How well we know the person, 0..1. Matching unlocks at READY.
 export const READY = 0.45;
 
 export function completeness(user) {
-  const conf = TRAIT_KEYS.map((k) => user.hidden.traits[k].confidence);
+  const conf = CORE_TRAITS.map((k) => user.hidden.traits[k].confidence);
   const traitScore = conf.reduce((a, b) => a + b, 0) / conf.length;
   const basics = ['gender', 'seeking', 'age', 'city'].filter((k) => user.basics[k] != null).length / 4;
   return Math.round((traitScore * 0.75 + basics * 0.25) * 100) / 100;
@@ -134,6 +167,8 @@ export function summarize(user) {
   if (sure.length) parts.push(`So far you come across as ${listJoin(sure.slice(0, 4))}.`);
   const prefs = Object.entries(user.hidden.preference || {}).filter(([, p]) => p.confidence >= 0.2 && Math.abs(p.value - 0.5) > 0.15);
   if (prefs.length) parts.push(`In a partner you have said you lean toward someone ${listJoin(prefs.map(([k, p]) => (p.value > 0.5 ? TRAITS[k].high : TRAITS[k].low)))}.`);
+  const love = ASPECTS.loveLanguage[user.hidden.aspects?.loveLanguage];
+  if (love) parts.push(`You feel most cared for through ${love}.`);
   if (user.hidden.dealbreakers.length) parts.push(`Dealbreakers: ${listJoin(user.hidden.dealbreakers.map((d) => d.replace(/-/g, ' ')))}.`);
   return parts.join(' ') || 'Still getting to know you. A few more answers and I will be able to describe you.';
 }
@@ -158,8 +193,32 @@ export function describeHidden(user) {
     tags: h.tags,
     dealbreakers: h.dealbreakers,
     values: h.values,
+    aspects: Object.entries(h.aspects || {}).map(([key, v]) => ({ key, value: v, label: ASPECTS[key]?.[v] })).filter((a) => a.label),
+    limits: describeLimits(h.limits || {}),
+    passReasons: countReasons(h.passReasons || []),
     notes: h.notes.slice(-8).map((n) => n.text),
   };
+}
+
+// Search limits learned from passes, in plain words. Each one can be removed.
+export function describeLimits(l) {
+  const out = [];
+  if (l.localOnly) out.push({ key: 'localOnly', text: 'Only people in your city' });
+  if (l.ageMin != null && l.ageMax != null) out.push({ key: 'age', text: `Ages ${l.ageMin} to ${l.ageMax}` });
+  else if (l.ageMin != null) out.push({ key: 'age', text: `Older than ${l.ageMin - 1}` });
+  else if (l.ageMax != null) out.push({ key: 'age', text: `Younger than ${l.ageMax + 1}` });
+  if (l.prefersDetail) out.push({ key: 'prefersDetail', text: 'People who share a little more on their profile' });
+  return out;
+}
+
+export const REASON_LABELS = {
+  spark: 'no spark', lifestyle: 'lives too different', distance: 'too far away', age: 'age', profile: 'profile said too little', other: 'something else',
+};
+
+function countReasons(list) {
+  const counts = {};
+  for (const r of list) counts[r.reason] = (counts[r.reason] || 0) + 1;
+  return Object.entries(counts).map(([reason, count]) => ({ reason, label: REASON_LABELS[reason] || reason, count }));
 }
 
 export function settingsOf(user) {
@@ -185,6 +244,7 @@ export function publicProfile(user, { showPhotos = false } = {}) {
     city: user.basics.city,
     bio: user.shared.bio || '',
     interests: user.shared.interests,
+    facts: FACT_KEYS.filter((k) => user.shared.facts?.[k]?.status === 'approved').map((k) => ({ key: k, label: FACTS[k].label, value: user.shared.facts[k].value })),
     items: user.shared.items.filter((i) => i.status === 'approved').map(({ prompt, text }) => ({ prompt, text })),
     photos: showPhotos ? photos.map((p) => `/api/photos/${p.id}`) : [],
     photosHidden: !showPhotos && photos.length > 0,

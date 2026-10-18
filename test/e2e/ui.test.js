@@ -44,10 +44,12 @@ test('a new person signs up, talks, approves a line, and sees two people', { ski
     await page.getByRole('heading', { name: 'This week' }).waitFor();
     assert.equal(await page.locator('article.person').count(), 2);
     await page.locator('article.person').first().getByRole('button', { name: 'Pass' }).click();
+    // Passing goes straight to the matchmaker, who asks why with quick replies.
+    await page.getByText(/What was the main reason/).last().waitFor();
+    await page.getByRole('button', { name: 'Something else' }).click();
+    await page.getByText(/didn't feel right about/).last().waitFor();
+    await page.getByRole('link', { name: 'This week', exact: true }).click();
     await page.getByText('You passed.').waitFor();
-
-    await page.getByRole('link', { name: 'Talk' }).click();
-    await page.waitForSelector('.msg.agent');
 
     // Basic accessibility: every control has a name, every field a label.
     for (const hash of ['#/talk', '#/week', '#/profile']) {

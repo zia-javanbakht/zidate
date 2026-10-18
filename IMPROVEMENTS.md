@@ -82,9 +82,12 @@ Asked for: complete the missing components and features, with up to 50 suggestio
 | 69 | Bug | Pausing mid-week still showed the week's picks. Paused now always wins. | Found by the new browser test |
 | 70 | Bug | Dialog dropdowns started empty, so "Add a line" always failed. Also: match messages now have their own bubble, and the forgot-password page keeps the email you typed. | Found by the new browser test; screenshots |
 | 71 | Feature | Pick the day your weekly two arrive (Settings), at midnight in your own time zone (taken from the browser at sign-up). Changing the day keeps the current pair, so a week is never repeated or skipped. | Unit tests for day/time-zone weeks and day changes; API test; screenshots |
+| 72 | Matching | Passing now opens a short conversation about why: the main reason as quick replies (only the ones that fit), then a follow-up for that reason. Answers steer partner preferences, set age or distance limits, or favour fuller profiles. The other person's hidden profile is never shown, only neutral labels. | Unit, API and browser tests |
+| 73 | Profile | Five more hidden traits (affection, disagreements, tidiness, independence, humour) with deeper questions; how someone feels cared for and how fast they like things to move; marriage and vegan tags. Readiness still uses the first eight traits, so nobody waits longer. | Unit tests |
+| 74 | Profile | Shared-profile facts (work, education, languages, height, looking for, kids, drinking, smoking, diet, pets), suggested from the conversation and shown only once approved; five more prompts. | Unit and API tests; screenshots |
 
-## Rebrand (72)
+## Rebrand (75)
 
 | # | Area | What changed | Verified by |
 |---|---|---|---|
-| 72 | Brand | ziDate is now Pishi ("cat" in Farsi): name everywhere, a flat vector cat logo (logo.svg) in the header, welcome page, favicon and app icons, a rose accent colour matching it, and `PISHI_*` environment variables (were `ZIDATE_*`). | Full suite; screenshots |
+| 75 | Brand | ziDate is now Pishi ("cat" in Farsi): name everywhere, a flat vector cat logo (logo.svg) in the header, welcome page, favicon and app icons, a rose accent colour matching it, and `PISHI_*` environment variables (were `ZIDATE_*`). | Full suite; screenshots |

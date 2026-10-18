@@ -1,6 +1,6 @@
 // Offline interviewer: deterministic, no network. Used when no API key is set, in tests,
 // and as the fallback when a Claude call fails.
-import { scoreTraits, findInterests, findTags, findDealbreakers, toSharedText, findValues } from './analyze.js';
+import { scoreTraits, findInterests, findTags, findDealbreakers, toSharedText, findValues, findFacts } from './analyze.js';
 import { TRAITS, TRAIT_KEYS } from '../traits.js';
 
 function hash(s) {
@@ -58,6 +58,7 @@ export const mockEngine = {
         update.interests = findInterests(answer);
         update.tags = findTags(answer);
         update.values = findValues(answer);
+        update.facts = findFacts(answer, pending?.id);
       }
       if (pending?.id === 'q_dealbreakers' || pending?.id === 'q_partner_trait') update.dealbreakers = findDealbreakers(answer);
       if (pending?.share) {

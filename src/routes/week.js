@@ -1,6 +1,8 @@
 // The weekly two: see them, decide, widen the search, report.
 import { weeklyPicks, compatibility, currentWeek } from '../matching.js';
-import { queueEvent } from '../agent/index.js';
+import { queueEvent, askNow } from '../agent/index.js';
+import { TRAIT_KEYS } from '../traits.js';
+import { normalizeCity } from '../cities.js';
 import { learnFromLike, createMatch } from '../social.js';
 import { cleanText } from '../profile.js';
 import { now } from '../clock.js';
@@ -16,6 +18,8 @@ export default function week(ctx) {
     const cur = user.basics.ageRange ?? 8;
     const next = steps.find((s) => s > cur) ?? cur;
     user.basics.ageRange = next;
+    // Widening also lifts age limits learned from passes.
+    if (user.hidden.limits) for (const k of ['ageMin', 'ageMax']) delete user.hidden.limits[k];
     const key = `${user.id}:${currentWeek(user)}`;
     const wk = store.data.weeks[key];
     // Keep decisions already made; only refill when the week had room.
@@ -43,7 +47,11 @@ export default function week(ctx) {
       if (other.demo && compatibility(other, user) >= 0.6) store.data.likes[`${other.id}>${user.id}`] = now().toISOString();
       if (store.data.likes[`${other.id}>${user.id}`]) match = createMatch(ctx, user, other);
     }
-    if (!match) queueEvent(convo, { type: decision, candidateId: other.id, name: other.name });
+    if (!match && decision === 'pass') {
+      queueEvent(convo, passEvent(user, other));
+      // Ask why straight away, unless another question about a suggestion is already waiting.
+      if (convo.pending?.kind !== 'feedback') askNow(user, convo);
+    } else if (!match) queueEvent(convo, { type: decision, candidateId: other.id, name: other.name });
     return { body: { decision, match: match ? { id: match.id } : null } };
   });
 
@@ -57,4 +65,28 @@ export default function week(ctx) {
     store.data.reports.push({ id: store.id('r'), by: user.id, about: params.id, reason: cleanText(body.reason, 500) || 'Reported from a suggestion', at: now().toISOString(), status: 'open', source: 'suggestion' });
     return { body: { ok: true } };
   });
+}
+
+// What the "why did you pass" questions may offer. Built here, where both people are known;
+// only neutral labels ever reach the person, never the other person's hidden values.
+function passEvent(user, other) {
+  const differ = TRAIT_KEYS
+    .filter((k) => user.hidden.traits[k].confidence >= 0.2 && other.hidden.traits[k].confidence >= 0.2)
+    .map((k) => ({ trait: k, value: other.hidden.traits[k].value, gap: Math.abs(user.hidden.traits[k].value - other.hidden.traits[k].value) }))
+    .filter((a) => a.gap >= 0.2)
+    .sort((a, b) => b.gap - a.gap)
+    .slice(0, 3)
+    .map(({ trait, value }) => ({ trait, value: Math.round(value * 100) / 100 }));
+  const [mine, theirs] = [user.basics.age, other.basics.age];
+  const approved = other.shared.items.filter((i) => i.status === 'approved').length + (other.shared.bio ? 1 : 0);
+  return {
+    type: 'pass',
+    candidateId: other.id,
+    name: other.name,
+    aspects: differ,
+    away: normalizeCity(user.basics.city) !== normalizeCity(other.basics.city),
+    age: theirs,
+    older: mine && theirs && mine !== theirs ? theirs > mine : null,
+    thin: approved < 2,
+  };
 }

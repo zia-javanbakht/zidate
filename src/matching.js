@@ -1,5 +1,5 @@
 // Weekly suggestions: exactly two people per week, picked from hidden profiles.
-import { TRAIT_KEYS, TOPICS } from './traits.js';
+import { TRAIT_KEYS, CORE_TRAITS, TOPICS } from './traits.js';
 import { basicsDone } from './profile.js';
 import { isReady, publicProfile, settingsOf } from './profile.js';
 import { normalizeCity } from './cities.js';
@@ -24,6 +24,9 @@ function ageOk(a, b) {
   if (!x || !y) return false;
   const gap = Math.abs(x - y);
   if (gap > (a.basics.ageRange ?? DEFAULT_AGE_RANGE) || gap > (b.basics.ageRange ?? DEFAULT_AGE_RANGE)) return false;
+  // Limits someone set after passing on a person who was too old or too young for them.
+  const within = (p, age) => (p.hidden.limits?.ageMin ?? 0) <= age && age <= (p.hidden.limits?.ageMax ?? 999);
+  if (!within(a, y) || !within(b, x)) return false;
   return Math.min(x, y) >= Math.max(x, y) / 2 + 7;
 }
 
@@ -78,7 +81,19 @@ export function fit(a, b) {
   const overlap = (x, y) => (x.length && y.length ? x.filter((v) => y.includes(v)).length / Math.min(x.length, y.length) : 0);
   score = score * 0.8 + overlap(a.hidden.values, b.hidden.values) * 0.1 + overlap(a.shared.interests, b.shared.interests) * 0.1;
   if (sameCity(a, b)) score += 0.05;
-  return Math.min(1, score);
+  // Small nudges from the categorical parts of the hidden profile.
+  const [la, lb] = [a.hidden.aspects?.loveLanguage, b.hidden.aspects?.loveLanguage];
+  if (la && la === lb) score += 0.03;
+  const pace = [a.hidden.aspects?.pace, b.hidden.aspects?.pace].sort().join();
+  if (pace === 'fast,slow') score -= 0.05;
+  if (a.hidden.limits?.prefersDetail) score += richness(b) >= 2 ? 0.04 : -0.04;
+  return Math.max(0, Math.min(1, score));
+}
+
+// How much someone shares on their profile: approved lines, a bio, and shown facts.
+function richness(u) {
+  const facts = Object.values(u.shared.facts || {}).filter((f) => f.status === 'approved').length;
+  return u.shared.items.filter((i) => i.status === 'approved').length + (u.shared.bio ? 1 : 0) + Math.floor(facts / 3);
 }
 
 // Mutual score: both people should be glad to see each other.
@@ -152,13 +167,15 @@ export function weeklyPicks(store, user) {
     if (!isReady(user)) {
       // Tell the person what is still missing, in plain words.
       const missing = basicsDone(user)
-        ? TRAIT_KEYS.filter((k) => user.hidden.traits[k].confidence < 0.25).slice(0, 3).map((k) => TOPICS[k])
+        ? CORE_TRAITS.filter((k) => user.hidden.traits[k].confidence < 0.25).slice(0, 3).map((k) => TOPICS[k])
         : ['a few basics (who you are looking for, your age and city)'];
       return { week: wk, ready: false, missing, picks: [], next: nextAt };
     }
     const seen = everSuggested(store, user.id);
     const ranked = Object.values(store.data.users)
       .filter((o) => !seen.has(o.id) && isReady(o) && eligible(user, o) && !closed(store, user, o))
+      // Either person may have asked to only meet people in their own city.
+      .filter((o) => sameCity(user, o) || !(user.hidden.limits?.localOnly || o.hidden.limits?.localOnly))
       // Someone who already liked this person is a likely mutual match: give them a lift.
       .map((o) => ({ o, s: compatibility(user, o) + (store.data.likes[`${o.id}>${user.id}`] ? 0.15 : 0), local: sameCity(user, o) }))
       // People nearby come first; only widen the search when the city runs out.

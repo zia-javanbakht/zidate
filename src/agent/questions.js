@@ -2,7 +2,10 @@
 // mode 'self'    -> answers describe the person (hidden traits)
 // mode 'partner' -> answers describe what they want (hidden preferences)
 // share          -> a good answer can become a suggested item on the shared profile
-// choices        -> quick replies; each maps straight to trait values
+// choices        -> quick replies; each maps straight to trait values (set), and may also
+//                   carry tags, aspects, facts (shared-profile suggestions), partner
+//                   preferences (prefer), search limits, a pass reason (reason), or the
+//                   next question to ask (then)
 
 export const BASICS = [
   {
@@ -56,7 +59,7 @@ export const QUESTIONS = [
     traits: ['family'],
     choices: [
       { label: 'I want kids', ack: 'Thank you, that matters a lot for matching.', set: { family: 0.9 }, tags: ['wants-kids'] },
-      { label: 'Open to it', ack: 'Open is good. Noted.', set: { family: 0.6 } },
+      { label: 'Open to it', ack: 'Open is good. Noted.', set: { family: 0.6 }, facts: { kids: 'Open to kids' } },
       { label: "I don't want kids", ack: 'Thank you, that matters a lot for matching.', set: { family: 0.2 }, tags: ['no-kids'] },
       { label: 'I already have kids', ack: 'Thank you for telling me.', set: { family: 0.85 }, tags: ['has-kids'] },
     ],
@@ -117,7 +120,7 @@ export const QUESTIONS = [
     traits: ['family'],
     choices: [
       { label: 'Something long-term', ack: 'Long-term. Good, that is what I do best.', set: { family: 0.65 }, tags: ['long-term'] },
-      { label: 'See where it goes', ack: 'No pressure. Good.', set: {} },
+      { label: 'See where it goes', ack: 'No pressure. Good.', set: {}, facts: { lookingFor: 'Seeing where it goes' } },
       { label: 'Something casual', ack: 'Fair enough, I will look for the same.', set: { family: 0.3 }, tags: ['casual'] },
     ],
   },
@@ -194,13 +197,125 @@ export const DEEPER = [
   { id: 'd_spirit2', mode: 'self', traits: ['spirituality'], text: 'What helps you feel grounded when life gets busy?' },
   { id: 'd_activity1', mode: 'self', traits: ['activity'], share: 'How I like to spend a free afternoon', text: 'You have a free afternoon and good weather. What happens?' },
   { id: 'd_activity2', mode: 'self', traits: ['activity'], text: 'What is the most physically tired you have been, in a good way?' },
+  { id: 'd_affection1', mode: 'self', traits: ['affection'], text: 'What makes you feel most cared for?', choices: [
+    { label: 'Kind words', ack: 'Words matter. Noted.', set: { affection: 0.55 }, aspects: { loveLanguage: 'words' } },
+    { label: 'Time together', ack: 'Time is the real gift.', set: { affection: 0.6 }, aspects: { loveLanguage: 'time' } },
+    { label: 'A hug, a hand to hold', ack: 'Warm. Noted.', set: { affection: 0.85 }, aspects: { loveLanguage: 'touch' } },
+    { label: 'Thoughtful little gifts', ack: 'The little things. Lovely.', set: { affection: 0.6 }, aspects: { loveLanguage: 'gifts' } },
+    { label: 'Help without asking', ack: 'Actions over words. Noted.', set: { affection: 0.4 }, aspects: { loveLanguage: 'help' } },
+  ] },
+  { id: 'd_affection2', mode: 'self', traits: ['affection'], share: 'The way to win me over', text: 'What is a small gesture that would win you over?' },
+  { id: 'd_conflict1', mode: 'self', traits: ['conflict'], text: 'When you disagree with someone close, you usually…', choices: [
+    { label: 'Talk it out right away', ack: 'Straight to it. Good.', set: { conflict: 0.85 } },
+    { label: 'Take a breather, then talk', ack: 'Sensible.', set: { conflict: 0.5 } },
+    { label: 'Need a day or two first', ack: 'Time to think. Noted.', set: { conflict: 0.15 } },
+  ] },
+  { id: 'd_conflict2', mode: 'self', traits: ['conflict'], text: 'What have past relationships taught you about how you argue and make up?' },
+  { id: 'd_tidy1', mode: 'self', traits: ['tidiness'], text: 'Be honest: your kitchen right now is…', choices: [
+    { label: 'Spotless', ack: 'Impressive.', set: { tidiness: 0.9 } },
+    { label: 'Lived in', ack: 'Like most kitchens.', set: { tidiness: 0.5 } },
+    { label: 'Best not to look', ack: 'Honesty. I like it.', set: { tidiness: 0.15 } },
+  ] },
+  { id: 'd_tidy2', mode: 'self', traits: ['tidiness'], share: 'What my home says about me', text: 'What would someone learn about you from walking into your home?' },
+  { id: 'd_indep1', mode: 'self', traits: ['independence'], text: 'In a relationship, how much time apart feels right?', choices: [
+    { label: 'We do most things together', ack: 'Together it is.', set: { independence: 0.15 } },
+    { label: 'A good mix', ack: 'Balanced.', set: { independence: 0.5 } },
+    { label: 'Plenty of my own time', ack: 'Space matters. Noted.', set: { independence: 0.85 } },
+  ] },
+  { id: 'd_indep2', mode: 'self', traits: ['independence'], share: 'Something I keep just for me', text: 'What is something you would always keep doing on your own, even in a relationship?' },
+  { id: 'd_humour1', mode: 'self', traits: ['humour'], text: 'Which humour is most you?', choices: [
+    { label: 'Dry and deadpan', ack: 'Dry it is.', set: { humour: 0.65 } },
+    { label: 'Silly and goofy', ack: 'Excellent.', set: { humour: 0.9 } },
+    { label: 'I am more earnest', ack: 'Sincere is good.', set: { humour: 0.2 } },
+  ] },
+  { id: 'd_humour2', mode: 'self', traits: ['humour'], share: 'A story that still makes me laugh', text: 'What is the funniest thing that has happened to you lately?' },
+  { id: 'd_pace', mode: 'partner', traits: [], text: 'When you meet someone you like, how quickly do you like things to move?', choices: [
+    { label: 'Slowly, friends first', ack: 'Slow and steady.', set: {}, aspects: { pace: 'slow' } },
+    { label: 'A steady pace', ack: 'Steady. Noted.', set: {}, aspects: { pace: 'steady' } },
+    { label: 'When I know, I know', ack: 'Decisive. Noted.', set: {}, aspects: { pace: 'fast' } },
+  ] },
+  { id: 'd_firstdate', mode: 'self', traits: ['adventure', 'social'], share: 'My idea of a great first date', text: 'What is your idea of a great first date?' },
+  { id: 'd_greenflags', mode: 'partner', traits: [], share: 'Green flags I look for', text: 'What are the green flags that make you think, this one is worth getting to know?' },
+  { id: 'd_marriage', mode: 'self', traits: ['family'], text: 'Is marriage something you see in your future?', choices: [
+    { label: 'Yes, I hope so', ack: 'Thank you, noted.', set: { family: 0.75 }, tags: ['wants-marriage'] },
+    { label: 'Maybe, if it feels right', ack: 'Open. Noted.', set: {} },
+    { label: 'Not for me', ack: 'Thank you for telling me.', set: {}, tags: ['no-marriage'] },
+  ] },
 ];
+
+// How the matchmaker names a part of someone's life when asking why a pass felt off.
+// Neutral on purpose: it must not reveal anything from the other person's hidden profile.
+const ASPECT_LABEL = {
+  social: 'Social life', adventure: 'Routine versus new things', ambition: 'Where work fits', family: 'Family plans',
+  planning: 'Plans versus spontaneity', intellect: 'What excites them', spirituality: 'Faith', activity: 'How active they are',
+  affection: 'How they show affection', conflict: 'How they handle disagreements', tidiness: 'Home life',
+  independence: 'Time together versus apart', humour: 'Sense of humour',
+};
+
+// Why did they pass? A short chain: the main reason, then one follow-up that turns it
+// into something matching can use. event: { candidateId, name, aspects, away, age, older, thin }
+function passQuestion(event) {
+  const { candidateId: cid, name } = event;
+  const base = { cid, name };
+  const choices = [
+    { label: 'No spark', ack: 'Fair, chemistry is hard to explain.', reason: 'spark', then: { type: 'pass-spark', ...base } },
+  ];
+  if (event.aspects?.length) {
+    choices.push({ label: 'Our lives seem different', ack: 'That helps.', reason: 'lifestyle', then: { type: 'pass-lifestyle', ...base, aspects: event.aspects } });
+  }
+  if (event.age && event.older != null) {
+    choices.push({ label: event.older ? 'A bit too old for me' : 'A bit too young for me', ack: 'Understood.', reason: 'age', then: { type: 'pass-age', ...base, age: event.age, older: event.older } });
+  }
+  if (event.away) {
+    choices.push({ label: 'Too far away', ack: 'Understood. From now on I will stick to people in your city.', reason: 'distance', limits: { localOnly: true } });
+  }
+  if (event.thin) {
+    choices.push({ label: 'Their profile said too little', ack: 'Noted. I will favour people who share a little more about themselves.', reason: 'profile', limits: { prefersDetail: true } });
+  }
+  choices.push({ label: 'Something else', ack: 'Okay.', reason: 'other', then: { type: 'pass-other', ...base } });
+  return { id: `fb_${cid}`, mode: 'partner', text: `You passed on ${name}. What was the main reason? Even a hunch helps me.`, choices };
+}
+
+function passFollowUp(event) {
+  const { cid, name } = event;
+  if (event.type === 'pass-spark') {
+    return { id: `fbs_${cid}`, mode: 'partner', text: 'Think of someone you clicked with straight away. What was it about them?' };
+  }
+  if (event.type === 'pass-lifestyle') {
+    // Point preferences away from where this person sat on each part of life.
+    const away = (a, confidence) => ({ trait: a.trait, value: 1 - a.value, confidence });
+    const top = event.aspects.slice(0, 3);
+    return {
+      id: `fbl_${cid}`, mode: 'partner',
+      text: `Which part of ${name}'s life felt furthest from yours?`,
+      choices: [
+        ...top.map((a) => ({ label: ASPECT_LABEL[a.trait], ack: 'Got it. I will look for someone closer to you there.', prefer: [away(a, 0.35)], detail: a.trait })),
+        { label: 'A bit of everything', ack: 'Got it, I will adjust across the board.', prefer: top.map((a) => away(a, 0.2)), detail: 'everything' },
+      ],
+    };
+  }
+  if (event.type === 'pass-age') {
+    const limit = event.older ? { ageMax: event.age - 1 } : { ageMin: event.age + 1 };
+    return {
+      id: `fba_${cid}`, mode: 'partner',
+      text: event.older ? `Should I only suggest people younger than ${event.age}?` : `Should I only suggest people older than ${event.age}?`,
+      choices: [
+        { label: 'Yes, please', ack: 'Done. You can change that on your profile.', limits: limit },
+        { label: 'No, it was more than age', ack: 'Okay.', then: { type: 'pass-other', cid, name } },
+      ],
+    };
+  }
+  if (event.type === 'pass-other') {
+    return { id: `fbo_${cid}`, mode: 'partner', text: `What didn't feel right about ${name}? Even a hunch helps me.` };
+  }
+  return null;
+}
+
 
 // Asked after the person reacts to a weekly suggestion. Answers update preferences.
 export function feedbackQuestion(event) {
-  if (event.type === 'pass') {
-    return { id: `fb_${event.candidateId}`, mode: 'partner', text: `You passed on ${event.name}. What didn't feel right? Even a hunch helps me.` };
-  }
+  if (event.type === 'pass') return passQuestion(event);
+  if (event.type?.startsWith('pass-')) return passFollowUp(event);
   if (event.type === 'like') {
     return { id: `fb_${event.candidateId}`, mode: 'partner', text: `You liked ${event.name}. What caught your eye?` };
   }

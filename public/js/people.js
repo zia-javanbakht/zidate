@@ -9,6 +9,7 @@ export function personCard(p, { onDecide, onReport } = {}) {
     p.photosHidden ? h('p', { class: 'hint' }, `${p.name} shares photos after you match.`) : null,
     p.bio ? h('p', { class: 'bio' }, p.bio) : null,
     p.reason ? h('p', { class: 'why' }, p.reason) : null,
+    p.facts?.length ? h('ul', { class: 'facts', 'aria-label': 'About' }, p.facts.map((f) => h('li', {}, h('span', {}, `${f.label}:`), f.value))) : null,
     p.interests?.length ? h('ul', { class: 'tags', 'aria-label': 'Interests' }, p.interests.map((i) => h('li', {}, i))) : null,
     p.items?.length ? h('dl', { class: 'qa' }, p.items.flatMap((i) => [h('dt', {}, i.prompt || 'About me'), h('dd', {}, i.text)])) : null);
   if (onDecide) {
@@ -88,7 +89,13 @@ export async function week() {
           location.hash = `#/match/${encodeURIComponent(res.match.id)}`;
           return;
         }
-        toast(decision === 'like' ? `I will let you know if ${p.name} likes you too.` : 'Passed. Tell me why when you have a moment.');
+        if (decision === 'pass') {
+          // The matchmaker asks why straight away; the answers shape next week's two.
+          toast(`Passed. A quick question about ${p.name}, then you can come back.`);
+          location.hash = '#/talk';
+          return;
+        }
+        toast(`I will let you know if ${p.name} likes you too.`);
         week();
       } catch (ex) {
         toast(ex.message);

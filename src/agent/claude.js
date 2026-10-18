@@ -3,7 +3,7 @@
 // The server decides *what* to ask next (so coverage and safety stay deterministic);
 // Claude reads the answer, extracts structured signals, and phrases the next question.
 import Anthropic from '@anthropic-ai/sdk';
-import { TRAITS, TRAIT_KEYS, TAGS, INTERESTS } from '../traits.js';
+import { TRAITS, TRAIT_KEYS, TAGS, INTERESTS, ASPECTS, FACTS, FACT_KEYS } from '../traits.js';
 import { describeHidden } from '../profile.js';
 
 const MODEL = process.env.PISHI_MODEL || 'claude-opus-5-5';
@@ -33,6 +33,8 @@ export const SCHEMA = {
     'sharedSuggestions',
     'privateNote',
     'bio',
+    'aspects',
+    'facts',
   ],
   properties: {
     reply: { type: 'string', description: 'A brief, warm acknowledgement (max one sentence) followed by the next question.' },
@@ -54,6 +56,20 @@ export const SCHEMA = {
     },
     privateNote: { type: 'string', description: 'One private observation useful for matching, or empty string.' },
     bio: { type: 'string', description: 'A two-sentence public bio draft in first person, or empty string if too early.' },
+    aspects: {
+      type: 'object',
+      additionalProperties: false,
+      required: Object.keys(ASPECTS),
+      properties: Object.fromEntries(Object.entries(ASPECTS).map(([k, v]) => [k, { type: 'string', enum: ['', ...Object.keys(v)] }])),
+      description: 'Hidden categorical traits, only when the answer clearly shows one; otherwise empty strings.',
+    },
+    facts: {
+      type: 'object',
+      additionalProperties: false,
+      required: FACT_KEYS,
+      properties: Object.fromEntries(FACT_KEYS.map((k) => [k, FACTS[k].options ? { type: 'string', enum: ['', ...FACTS[k].options] } : { type: 'string' }])),
+      description: 'Plain facts they stated outright (e.g. their job, languages they speak), suggested for the shared profile. Empty string for anything not stated. Short: a few words each.',
+    },
   },
 };
 
@@ -69,6 +85,9 @@ Rules:
 - Extract only what the answer actually supports. Low confidence (0.1-0.3) for hints, higher (0.4-0.6) for clear statements. Empty arrays are fine.
 - When the question was about a partner or a past suggestion, put signals in preferenceUpdates, not traitUpdates.
 - Shared suggestions must be in their voice, true to what they said, and contain nothing sensitive (no health, exact workplace, address, or anything they would not want strangers to read).
+- aspects: loveLanguage is how they most feel cared for (${Object.keys(ASPECTS.loveLanguage).join(', ')}); pace is how quickly they like a new relationship to move (${Object.keys(ASPECTS.pace).join(', ')}).
+- facts are only suggestions the person approves; fill one only when they said it plainly, and never guess height or education.
+- After a pass, the app asks why. Treat what they say as evidence about the partner they want (preferenceUpdates), never as a judgement to repeat about the other person.
 - Never reveal hidden-profile content to anyone, and do not repeat trait scores back to the person.
 - reply: at most one short sentence reacting to what they said (specific, not gushing), then the next question. Keep the meaning of the next question; if it lists quick-reply options, do not list them in text. No emoji. Plain, warm, minimal.
 - If the answer is off-topic, hostile, or unsafe, do not extract anything and gently steer back.`;

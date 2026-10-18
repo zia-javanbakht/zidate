@@ -98,7 +98,7 @@ test('export gives you all your data as a download', async () => {
   assert.match(res.headers.get('content-disposition'), /attachment/);
   const data = await res.json();
   assert.equal(data.account.email, 'exp@x.co');
-  assert.ok(data.hiddenProfile.traits.length === 8);
+  assert.ok(data.hiddenProfile.traits.length === 13);
   assert.ok(data.conversationWithMatchmaker.length > 5);
 });
 
@@ -318,4 +318,34 @@ test('each person picks the day their two arrive', async () => {
   const next = new Date(after.next);
   assert.equal(new Date(next.getTime() + 9 * 3600e3).getUTCDay(), day);
   assert.equal(new Date(next.getTime() + 9 * 3600e3).getUTCHours(), 0);
+});
+
+test('facts: set, validate, hide and show on the shared profile', async () => {
+  const c = client(srv.base);
+  const { me } = await onboard(c, { email: 'facts@x.co' });
+  assert.equal((await c.put('/api/profile/facts', { facts: { star: 'Leo' } })).status, 400);
+  assert.equal((await c.put('/api/profile/facts', { facts: { kids: 'Maybe one day' } })).status, 400);
+  assert.equal((await c.put('/api/profile/facts', { facts: { work: 'DM me @nurse_jo' } })).status, 400);
+  const r = await c.put('/api/profile/facts', { facts: { work: 'Nurse', languages: 'English, Farsi', kids: 'wants kids' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.facts.kids.value, 'Wants kids');
+  let preview = (await c.get('/api/profile')).data.preview;
+  assert.deepEqual(preview.facts.map((f) => f.key), ['work', 'languages', 'kids']);
+  await c.patch('/api/profile/facts/work', { status: 'hidden' });
+  await c.put('/api/profile/facts', { facts: { languages: '' } });
+  preview = (await c.get('/api/profile')).data.preview;
+  assert.deepEqual(preview.facts.map((f) => f.key), ['kids']);
+  assert.ok(srv.store.data.users[me.id].shared.facts.work, 'hidden facts are kept');
+});
+
+test('limits learned from passes can be lifted from the hidden profile', async () => {
+  const c = client(srv.base);
+  const { me } = await onboard(c, { email: 'limits@x.co' });
+  Object.assign(srv.store.data.users[me.id].hidden.limits, { localOnly: true, ageMax: 39 });
+  let hidden = (await c.get('/api/profile')).data.hidden;
+  assert.deepEqual(hidden.limits.map((l) => l.key), ['localOnly', 'age']);
+  assert.equal((await c.del('/api/profile/limits/nope')).status, 404);
+  await c.del('/api/profile/limits/age');
+  hidden = (await c.get('/api/profile')).data.hidden;
+  assert.deepEqual(hidden.limits.map((l) => l.key), ['localOnly']);
 });
