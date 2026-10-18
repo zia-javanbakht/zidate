@@ -22,6 +22,9 @@ import week from './routes/week.js';
 import matches from './routes/matches.js';
 import notifications from './routes/notifications.js';
 import admin from './routes/admin.js';
+import verification from './routes/verification.js';
+import { pickChecker } from './verification.js';
+import dates from './routes/dates.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(ROOT, 'public');
@@ -42,9 +45,9 @@ export function newUser(store, { name, email, password }) {
     emailVerified: false,
     password: password ? hashPassword(password) : null,
     createdAt: now().toISOString(),
-    basics: { gender: null, seeking: null, age: null, city: null },
+    basics: { gender: null, seeking: null, age: null, city: null, distance: null },
     hidden: emptyHidden(),
-    shared: { bio: '', bioDraft: '', interests: [], items: [], facts: {} },
+    shared: { bio: '', bioDraft: '', interests: [], items: [], facts: {}, openers: [] },
     photos: [],
   };
   settingsOf(user);
@@ -63,6 +66,7 @@ export function createApp(store, opts = {}) {
     baseUrl = 'http://localhost:3000',
     log = false,
     vision = pickVision(),
+    selfieChecker = pickChecker,
   } = opts;
   // People stored before the profile gained new parts get them now.
   for (const u of Object.values(store.data.users)) upgradeUser(u);
@@ -77,7 +81,7 @@ export function createApp(store, opts = {}) {
   const isAdmin = (user) => Boolean(user && admins.includes(user.email));
 
   const ctx = {
-    store, route, hub, mailer, photos, looks, baseUrl, HttpError, isAdmin,
+    store, route, hub, mailer, photos, looks, baseUrl, HttpError, isAdmin, selfieChecker,
     newUser: (o) => newUser(store, o),
     cookie,
     startSession(user) {
@@ -142,7 +146,8 @@ export function createApp(store, opts = {}) {
     return n;
   }
 
-  for (const register of [account, chat, profile, week, matches, notifications, admin]) register(ctx);
+  // verification first: it provides ctx.onPhotoAdded, which the photo upload calls.
+  for (const register of [verification, account, chat, profile, week, matches, dates, notifications, admin]) register(ctx);
   route('GET', '/api/health', async () => ({ body: { ok: true, version: VERSION, engine: pickEngine().name, uptime: Math.round(process.uptime()) } }), { auth: false });
 
   function serveStatic(req, res) {

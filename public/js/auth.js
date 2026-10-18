@@ -44,7 +44,7 @@ export function welcome() {
 
   render(h('section', { class: 'welcome' },
     h('div', { class: 'stack' },
-      h('img', { class: 'logo', src: '/logo.svg', alt: 'Pishi', width: 112, height: 112 }),
+      h('img', { class: 'logo', src: '/logo.svg', alt: 'Pishi', width: 128, height: 128 }),
       h('h1', {}, 'Two people a week.', h('br'), h('span', { class: 'muted' }, 'Chosen through conversation.')),
       h('p', { class: 'lede' }, 'No swiping. Talk with your matchmaker, decide what others see, and meet two people each week.')),
     h('ol', { class: 'how' },
@@ -136,7 +136,12 @@ export function about() {
     p('I also learn from what you do: who you like and pass on, how conversations with matches go, and when you are usually around. These signals are only used to choose people for you. They are not shown in the app, and they are included when you download your data.'),
     p('With Pishi Plus, I also learn which looks you go for. An AI model describes each profile photo once, in plain style words such as long hair, glasses, smart clothes or outdoors, and I notice which of those you tend to like when you could see someone\'s photos before deciding. It never records ethnicity, skin colour, body shape or size, age, or how attractive anyone is. Like the other signals, this is only used to choose people for you.'),
     h('h2', {}, 'Two people a week'),
-    p('Every Monday you get two suggestions, people in your city first. Like or pass, and tell me why: it makes the next pair better. When you both like each other, you can talk.'),
+    p('Every week, on the day you choose, you get two suggestions, people near you first, and only as far away as you are both happy to go. Like or pass, and tell me why: it makes the next pair better. You can like one line or photo and add a note; they see it on your card. When you both like each other, you can talk.'),
+    h('h2', {}, 'No one left waiting'),
+    p('If someone has been waiting a couple of days for your reply, your next two wait too, until you answer or close that conversation kindly. Closing sends one polite last message, so nobody is left wondering.'),
+    h('h2', {}, 'After you meet'),
+    p('A week after you match, I ask whether you met and whether you would see them again. Only I see your answer. It teaches me what works for you in person, and, counted across everyone who met someone, nudges who I suggest. What you said about someone is deleted with your account.'),
     h('h2', {}, 'Privacy and safety'),
-    p('Photos can stay hidden until you match. Messages that look abusive are not sent. You can report or unmatch anyone, pause whenever you like, download all your data, and delete your account at any time. Deleting removes everything, including photos and conversations.')));
+    p('Before a date, you can share who you are meeting, where and when with someone you trust. Afterwards I ask if you are home safe, and email them if I do not hear from you. Pishi never knows where you are and does not call emergency services.'),
+    p('Photos can stay hidden until you match. Messages that look abusive are not sent. You can report or unmatch anyone, pause whenever you like, download all your data, and delete your account at any time. Photo verification compares a selfie in a random pose with your photos (by Claude, or by a moderator when the check is unsure); the selfie is never shown on your profile. Deleting removes everything, including photos, your verification selfie and conversations.')));
 }

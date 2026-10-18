@@ -1,6 +1,7 @@
 // The conversation with the matchmaker.
 import { respond, opening, resume, SKIP_RE } from '../agent/index.js';
 import { noteAnswer, noteObservations, signalsOf } from '../signals.js';
+import { recordMet, recordMetReason } from '../dates.js';
 
 export default function chat({ store, route, HttpError, meView, serial }) {
   route('GET', '/api/chat', async ({ user }) => {
@@ -22,6 +23,11 @@ export default function chat({ store, route, HttpError, meView, serial }) {
       observations: sig.observations.map((o) => o.text),
       save: (list) => noteObservations(store, user, list),
     });
+    // "Did you meet?" answers need both people, so they are applied here.
+    const met = /^(ci|mo)_/.test(pending?.id || '') && pending.choices?.find((c) => typeof c === 'object' && c.label.toLowerCase() === text.toLowerCase());
+    const other = met && store.data.users[pending.id.slice(3)];
+    if (other && met.met) recordMet(store, user, other, met.met);
+    if (other && met.metReason) recordMetReason(store, user, other, met.metReason);
     if (pending && pending.kind !== 'basic') {
       const quickReply = Boolean(pending.choices?.some((c) => (typeof c === 'string' ? c : c.label).toLowerCase() === text.toLowerCase()));
       noteAnswer(store, user, { text, askedAt, skipped: SKIP_RE.test(text), quickReply });

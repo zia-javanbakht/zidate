@@ -2,20 +2,25 @@
 import { TRAIT_KEYS, CORE_TRAITS, TOPICS } from './traits.js';
 import { basicsDone } from './profile.js';
 import { isReady, publicProfile, settingsOf } from './profile.js';
-import { normalizeCity } from './cities.js';
+import { distanceKm, NEARBY_KM, FEW_HOURS_KM } from './cities.js';
 import { weekKey, nextWeekStart, now } from './clock.js';
 import { lookBoost } from './looks.js';
+import { dateRating, photoMismatches } from './dates.js';
+import { waitingOn } from './turns.js';
 import { revealedPreferences, likeChance, responsiveness, popularity, hoursOverlap, noteShown, reportCounts } from './signals.js';
 
 export const PER_WEEK = 2;
 
+// Who each choice of "I want to meet" includes. Non-binary people can be included on
+// their own or together with women or men, not only under "everyone".
+export const SEEKING = {
+  women: ['woman'], men: ['man'], nonbinary: ['nonbinary'],
+  'women-nb': ['woman', 'nonbinary'], 'men-nb': ['man', 'nonbinary'],
+  everyone: ['woman', 'man', 'nonbinary'],
+};
+
 function wants(seeker, other) {
-  const s = seeker.basics.seeking;
-  const g = other.basics.gender;
-  if (s === 'everyone') return true;
-  if (s === 'women') return g === 'woman';
-  if (s === 'men') return g === 'man';
-  return false;
+  return Boolean(SEEKING[seeker.basics.seeking]?.includes(other.basics.gender));
 }
 
 export const DEFAULT_AGE_RANGE = 8;
@@ -32,8 +37,32 @@ function ageOk(a, b) {
   return Math.min(x, y) >= Math.max(x, y) / 2 + 7;
 }
 
-function sameCity(a, b) {
-  return normalizeCity(a.basics.city) === normalizeCity(b.basics.city);
+// How far someone is willing to go for a relationship, in km. Infinity when distance is no
+// object (or they have not said). "Too far away" on a pass narrows it to their own area.
+export function maxDistance(u) {
+  if (u.hidden.limits?.localOnly) return NEARBY_KM;
+  return { near: NEARBY_KM, hours: FEW_HOURS_KM }[u.basics.distance] ?? Infinity;
+}
+
+export function distanceBetween(a, b) {
+  return distanceKm(a.basics.city, b.basics.city);
+}
+
+// Both people must be happy with the distance. When one of them wants someone close and we
+// do not know where the other city is, only the same city counts as close.
+function distanceOk(a, b) {
+  const limit = Math.min(maxDistance(a), maxDistance(b));
+  if (limit === Infinity) return true;
+  const d = distanceBetween(a, b);
+  return d != null && d <= limit;
+}
+
+// Same area first, then a few hours away, then further. Unknown distances count as far.
+function distanceTier(a, b) {
+  const d = distanceBetween(a, b);
+  if (d != null && d <= NEARBY_KM) return 0;
+  if (d != null && d <= FEW_HOURS_KM) return 1;
+  return 2;
 }
 
 // Out of the pool: paused, suspended, or stopped (e.g. under 18).
@@ -56,6 +85,7 @@ export function eligible(a, b) {
   if (a.id === b.id || inactive(a) || inactive(b)) return false;
   if (!wants(a, b) || !wants(b, a)) return false;
   if (!ageOk(a, b)) return false;
+  if (!distanceOk(a, b)) return false;
   if (kidsConflict(a, b)) return false;
   if (dealbreaker(a, b) || dealbreaker(b, a)) return false;
   return true;
@@ -85,7 +115,12 @@ export function fit(a, b) {
   // ones are ever named to the other person (see reason()).
   const said = (u) => [...u.shared.interests, ...(u.shared.suggestedInterests || [])];
   score = score * 0.8 + overlap(a.hidden.values, b.hidden.values) * 0.1 + overlap(said(a), said(b)) * 0.1;
-  if (sameCity(a, b)) score += 0.05;
+  // Closer is easier: a small bonus for the same area, less for a few hours away. Someone
+  // open to long distance does not mind the rest; anyone else is nudged towards closer people.
+  const tier = distanceTier(a, b);
+  if (tier === 0) score += 0.05;
+  else if (tier === 1) score += 0.02;
+  else if (a.basics.distance !== 'any') score -= 0.02;
   // Small nudges from the categorical parts of the hidden profile.
   const [la, lb] = [a.hidden.aspects?.loveLanguage, b.hidden.aspects?.loveLanguage];
   if (la && la === lb) score += 0.03;
@@ -136,6 +171,11 @@ export function signalBoost(store, a, b, reports = reportCounts(store)) {
   boost -= Math.min(0.15, (reports.get(b.id) || 0) * 0.05);
   // Spread attention: someone almost everyone likes does not need to be in every pair.
   boost -= (popularity(sb) - 0.5) * 0.06;
+  // How meeting b in person went for others: wanted again lifts a little, and "did not look
+  // like their photos" counts against them. Counted across people, never one review alone.
+  const rating = dateRating(sb);
+  if (rating != null) boost += (rating - 0.5) * 0.1;
+  boost -= Math.min(0.12, Math.max(0, photoMismatches(sb) - 1) * 0.04);
   const hours = hoursOverlap(sa, sb);
   if (hours != null) boost += (hours - 0.5) * 0.04;
   // Pishi Plus: the styles a has gone for in photos.
@@ -145,15 +185,49 @@ export function signalBoost(store, a, b, reports = reportCounts(store)) {
 
 // A reason shown to the person. Built only from shared information, never hidden traits.
 export function reason(a, b) {
-  const away = sameCity(a, b) ? '' : ` A little further away, in ${b.basics.city}.`;
+  // Cities are on both profiles, so the distance between them is fair to mention.
+  const d = distanceBetween(a, b);
+  const away = d === 0 ? ''
+    : d == null ? ` A little further away, in ${b.basics.city}.`
+    : d <= NEARBY_KM ? ` Close by, in ${b.basics.city}.`
+    : ` About ${roundKm(d)} km away, in ${b.basics.city}.`;
   return sharedReason(a, b) + away;
+}
+
+function roundKm(d) {
+  return d < 100 ? Math.round(d / 5) * 5 : d < 1000 ? Math.round(d / 10) * 10 : Math.round(d / 100) * 100;
 }
 
 function sharedReason(a, b) {
   const common = a.shared.interests.filter((i) => b.shared.interests.includes(i));
-  if (common.length >= 2) return `You both like ${common[0]} and ${common[1]}.`;
-  if (common.length === 1) return `You both like ${common[0]}.`;
-  return 'Our conversations suggest you would get on.';
+  const fact = sharedFact(a, b);
+  if (common.length >= 2) return `You both like ${common[0]} and ${common[1]}.${fact ? ` ${fact}` : ''}`;
+  if (common.length === 1) return `You both like ${common[0]}.${fact ? ` ${fact}` : ''}`;
+  return fact || 'Our conversations suggest you would get on.';
+}
+
+// Something both chose to show that matters for a relationship (as OkCupid explains a match,
+// but in words, not a number). Only approved facts on both profiles, never hidden ones.
+const FACT_REASONS = {
+  lookingFor: { 'Something long-term': 'You are both looking for something long-term.', 'Seeing where it goes': 'You are both happy to see where it goes.' },
+  kids: { 'Wants kids': 'You both want kids one day.', "Doesn't want kids": 'Neither of you wants kids.', 'Has kids': 'You both have kids.' },
+  drinking: { "Doesn't drink": 'Neither of you drinks.' },
+  smoking: { "Doesn't smoke": 'Neither of you smokes.' },
+  diet: { Vegetarian: 'You are both vegetarian.', Vegan: 'You are both vegan.' },
+  pets: { 'Has pets': 'You both have pets.' },
+};
+
+function sharedFact(a, b) {
+  const shown = (u, k) => (u.shared.facts?.[k]?.status === 'approved' ? u.shared.facts[k].value : null);
+  for (const [k, lines] of Object.entries(FACT_REASONS)) {
+    const v = shown(a, k);
+    if (v && v === shown(b, k) && lines[v]) return lines[v];
+  }
+  const langs = (u) => (shown(u, 'languages') || '').toLowerCase().split(/[,/&]|\band\b/).map((x) => x.trim()).filter(Boolean);
+  const other = new Set(langs(b));
+  const both = langs(a).filter((l) => other.has(l) && l !== 'english');
+  if (both.length) return `You both speak ${both[0][0].toUpperCase()}${both[0].slice(1)}.`;
+  return null;
 }
 
 // Everyone ever suggested to this person. Kept as an index so ranking does not scan every
@@ -211,12 +285,15 @@ function rank(store, user) {
   const reports = reportCounts(store);
   return Object.values(store.data.users)
     .filter((o) => !seen.has(o.id) && isReady(o) && eligible(user, o) && !closed(store, user, o))
-    // Either person may have asked to only meet people in their own city.
-    .filter((o) => sameCity(user, o) || !(user.hidden.limits?.localOnly || o.hidden.limits?.localOnly))
     // Someone who already liked this person is a likely mutual match: give them a lift.
-    .map((o) => ({ o, s: compatibility(user, o) + signalBoost(store, user, o, reports) + (store.data.likes[`${o.id}>${user.id}`] ? 0.15 : 0), local: sameCity(user, o) }))
-    // People nearby come first; only widen the search when the city runs out.
-    .sort((p, q) => q.local - p.local || q.s - p.s || p.o.id.localeCompare(q.o.id));
+    .map((o) => ({ o, s: compatibility(user, o) + signalBoost(store, user, o, reports) + (store.data.likes[`${o.id}>${user.id}`] ? 0.15 : 0), tier: openToDistance(user) ? 0 : distanceTier(user, o) }))
+    // People nearby come first and the search only reaches further when the area runs out,
+    // unless this person told us distance does not matter to them.
+    .sort((p, q) => p.tier - q.tier || q.s - p.s || p.o.id.localeCompare(q.o.id));
+}
+
+function openToDistance(u) {
+  return u.basics.distance === 'any' && !u.hidden.limits?.localOnly;
 }
 
 // Top up a week to PER_WEEK people, keeping whoever is already in it.
@@ -252,6 +329,9 @@ export function weeklyPicks(store, user) {
         : ['a few basics (who you are looking for, your age and city)'];
       return { week: wk, ready: false, missing, picks: [], next: nextAt };
     }
+    // The next two wait until the people already waiting on this person get an answer.
+    const owed = waitingOn(store, user);
+    if (owed.length) return { week: wk, ready: true, held: true, owed: owed.map(({ matchId: id, name }) => ({ matchId: id, name })), picks: [], next: nextAt };
     week = { createdAt: now().toISOString(), picks: [] };
     store.data.weeks[key] = week;
     fillWeek(store, user, week);
@@ -268,11 +348,20 @@ export function weeklyPicks(store, user) {
         const other = store.data.users[p.id];
         const matched = Boolean(store.data.matches[matchId(user.id, other.id)]);
         const showPhotos = matched || !settingsOf(other).photosAfterMatch;
-        return { ...publicProfile(other, { showPhotos }), reason: reason(user, other), decision: p.decision, matchId: matched ? matchId(user.id, other.id) : null };
+        return { ...publicProfile(other, { showPhotos }), reason: reason(user, other), decision: p.decision, matchId: matched ? matchId(user.id, other.id) : null, likedYou: p.decision ? null : likedYou(store, other, user) };
       }),
     // Offer to widen the search when this week came up short.
     widen: week.picks.length < PER_WEEK && canWiden(user),
   };
+}
+
+// What someone said when they liked one part of this person's profile. A plain like stays
+// private until it is mutual; a note is meant to be read, so it shows on their card.
+function likedYou(store, from, to) {
+  const n = store.data.likeNotes?.[`${from.id}>${to.id}`];
+  if (!n) return null;
+  const on = n.on?.kind === 'photo' ? { photo: `/api/photos/${n.on.photoId}` } : n.on ? { prompt: n.on.prompt, text: n.on.text } : null;
+  return { note: n.note || '', on };
 }
 
 export function matchId(a, b) {
@@ -287,10 +376,38 @@ export function runWeekly(store, notify) {
     const key = `${u.id}:${currentWeek(u)}`;
     if (store.data.weeks[key]) continue;
     const res = weeklyPicks(store, u);
+    if (res.held) {
+      // Once per week: say what the two are waiting for.
+      store.data.held ||= {};
+      if (store.data.held[key]) continue;
+      store.data.held[key] = now().toISOString();
+      const names = res.owed.map((o) => o.name);
+      notify?.(u, { type: 'picks', text: `Your two for this week are waiting. Answer ${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]} first, or close it kindly.`, link: '#/week' });
+      continue;
+    }
     if (res.picks.length) {
       made++;
       notify?.(u, { type: 'picks', text: 'Your two people for this week are here.', link: '#/week' });
     }
   }
   return made;
+}
+
+// The day before a week ends, remind anyone who has not decided on this week's people yet.
+// Undecided suggestions are not carried over, so this is the last chance.
+export function runReminders(store, notify) {
+  let n = 0;
+  const t = Date.parse(now().toISOString());
+  for (const u of Object.values(store.data.users)) {
+    if (u.demo || inactive(u)) continue;
+    const week = store.data.weeks[`${u.id}:${currentWeek(u)}`];
+    if (!week || week.reminded) continue;
+    const open = week.picks.filter((p) => !p.decision && available(store, u, store.data.users[p.id]));
+    if (!open.length || Date.parse(nextWeek(u).toISOString()) - t > 864e5) continue;
+    week.reminded = now().toISOString();
+    const names = open.map((p) => store.data.users[p.id].name);
+    notify?.(u, { type: 'picks', text: `Last day to decide on ${names.join(' and ')}. New people arrive tomorrow.`, link: '#/week' });
+    n++;
+  }
+  return n;
 }

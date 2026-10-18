@@ -73,10 +73,27 @@ test('matches, live messages, profile tools, settings, moderation and password r
     await page.locator('.list .when').first().waitFor();
 
     // Profile: a photo, a line of my own and an interest, all through in-page dialogs.
-    await page.getByRole('link', { name: 'You' }).click();
+    await page.getByRole('link', { name: 'You', exact: true }).click();
     await page.getByRole('heading', { name: 'Photos' }).waitFor();
     await page.locator('input[type=file]').setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: PNG });
     await page.locator('.photo img').first().waitFor();
+    // One photo is a start; the page asks for three, then the preview lets you flip through them.
+    await page.getByText('Add 2 more to reach three.').waitFor();
+    for (const n of [2, 3]) {
+      await page.locator('input[type=file]').setInputFiles({ name: `me${n}.png`, mimeType: 'image/png', buffer: PNG });
+      await page.waitForFunction((k) => document.querySelectorAll('.photo img').length === k, n);
+    }
+    assert.equal(await page.locator('.nudge').count(), 0);
+    await page.getByText('Preview as a match sees it').click();
+    const shots = page.getByRole('region', { name: /^Photos of / });
+    await shots.locator('.count', { hasText: '1 / 3' }).waitFor();
+    await shots.getByRole('button', { name: 'Next photo' }).click();
+    await shots.locator('.count', { hasText: '2 / 3' }).waitFor();
+    await shots.getByRole('button', { name: 'Photo 3 of 3' }).click();
+    await shots.locator('.count', { hasText: '3 / 3' }).waitFor();
+    assert.equal(await shots.getByRole('button', { name: 'Next photo' }).isDisabled(), true);
+    await shots.press('ArrowLeft');
+    await shots.locator('.count', { hasText: '2 / 3' }).waitFor();
     await page.getByRole('button', { name: '+ Add a line of my own' }).click();
     await page.getByLabel('Your answer').fill('Sunday markets and a long lunch.');
     await page.getByRole('button', { name: 'Add', exact: true }).click();

@@ -29,6 +29,10 @@ function parseBasic(key, text) {
     return null;
   }
   if (key === 'seeking') {
+    const nb = /non[- ]?binary|enby|\bnb\b/.test(t);
+    if (nb && /\b(women|woman|girls|ladies)\b/.test(t)) return 'women-nb';
+    if (nb && /\b(men|man|guys)\b/.test(t)) return 'men-nb';
+    if (nb) return 'nonbinary';
     if (/^(women|woman|female|girls|ladies)$/.test(t)) return 'women';
     if (/^(men|man|male|guys)$/.test(t)) return 'men';
     if (/everyone|both|any|all|anyone|doesn'?t matter/.test(t)) return 'everyone';
@@ -53,7 +57,18 @@ const BASIC_HINT = {
   city: 'I need your city to suggest people near you. Just the name is perfect.',
 };
 
+// A free-text answer to the distance question, for people who type instead of tapping.
+export function parseDistance(text) {
+  const t = text.toLowerCase();
+  if (/no problem|anywhere|don'?t mind|doesn'?t matter|long[- ]distance is (fine|ok)|^(yes|yeah|sure)\b|open to/.test(t)) return 'any';
+  if (/hour|drive|train|weekend|not too far/.test(t)) return 'hours';
+  if (/near|close|same city|local|my (city|area|town)|^no\b|^nope|not really/.test(t)) return 'near';
+  return null;
+}
+
 function questionScore(q, user, answeredSelf, lastHadChoices) {
+  // Early questions come third: after a couple of easy ones, before the deep ones.
+  if (q.early) return answeredSelf >= 2 ? 5 : -1;
   if (q.mode === 'partner' && answeredSelf < 4) return -1;
   const conf = q.traits.map((k) => user.hidden.traits[k].confidence);
   const need = conf.length ? conf.reduce((a, c) => a + (1 - c), 0) / conf.length : 0.5;
@@ -74,7 +89,7 @@ export function nextQuestion(user, convo) {
   const answeredSelf = convo.asked.filter((id) => QUESTIONS.find((q) => q.id === id)?.mode === 'self').length;
   const lastId = [...convo.asked].reverse().find((id) => QUESTIONS.some((q) => q.id === id) || DEEPER.some((q) => q.id === id));
   const lastHadChoices = Boolean([...QUESTIONS, ...DEEPER].find((q) => q.id === lastId)?.choices);
-  const open = QUESTIONS.filter((q) => !convo.asked.includes(q.id))
+  const open = QUESTIONS.filter((q) => !convo.asked.includes(q.id) && !q.skipIf?.(user))
     .map((q) => [q, questionScore(q, user, answeredSelf, lastHadChoices)])
     .filter(([, s]) => s >= 0)
     .sort((a, b) => b[1] - a[1]);
@@ -159,6 +174,9 @@ export async function respond(user, convo, rawText, engine = pickEngine(), signa
     Object.assign(user.basics, choice.basics || {});
     applyPassChoice(user, convo, pending, choice);
     choiceApplied = true;
+  } else if (pending?.id === 'q_distance') {
+    const distance = parseDistance(text);
+    if (distance) user.basics.distance = distance;
   }
 
   const next = nextQuestion(user, convo);
@@ -202,12 +220,15 @@ export async function respond(user, convo, rawText, engine = pickEngine(), signa
 // on the profiles. Never more than once every six answers, never the same step twice in a row.
 const NUDGE_EVERY = 6;
 const NUDGES = {
-  photo: 'People are far more likely to say yes when they can see you. Add a photo when you have a moment.',
+  photo: (user) => ((user.photos || []).length
+    ? 'One or two photos is a start. Three, like a face shot, one doing something you love and one full-length, give people a much better sense of you.'
+    : 'People are far more likely to say yes when they can see you. Add three photos when you have a moment.'),
   bio: 'You do not have a bio yet. Two sentences are enough, and I have drafted one you can use.',
   lines: 'Your shared profile is a bit quiet. A few lines in your own words give your matches something to reply to.',
   review: 'I have suggested some lines for your shared profile. They only appear once you approve them.',
   facts: 'A few plain facts, like your work or whether you want kids, save your matches a lot of guessing.',
   interests: 'Add a few interests so I can tell your matches what you have in common.',
+  openers: 'Add an opening question to your profile. Your matches can answer it, so nobody has to think of a first line.',
   dealbreakers: 'Is there anything you could never accept in a partner? You can set dealbreakers on your profile.',
 };
 
@@ -220,7 +241,7 @@ function guideNudge(user, convo) {
   if (!step) return;
   convo.flags.sinceNudge = 0;
   convo.flags.lastNudge = step.id;
-  convo.messages.push({ role: 'agent', notice: 'guide', text: NUDGES[step.id], link: step.action.href, label: step.action.label, at: now().toISOString() });
+  convo.messages.push({ role: 'agent', notice: 'guide', text: typeof NUDGES[step.id] === 'function' ? NUDGES[step.id](user) : NUDGES[step.id], link: step.action.href, label: step.action.label, at: now().toISOString() });
 }
 
 // After a day or more away, greet the person and repeat where we were.

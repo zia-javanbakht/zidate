@@ -9,7 +9,7 @@
 // the person chose in the basics, finances, or judgements of how attractive anyone is.
 // The looks part (Pishi Plus, see looks.js) only counts fixed style words.
 import { TRAIT_KEYS } from './traits.js';
-import { normalizeCity } from './cities.js';
+import { nearby } from './cities.js';
 import { cleanText } from './profile.js';
 import { now } from './clock.js';
 import { lookLeanings } from './looks.js';
@@ -35,6 +35,10 @@ function blank() {
     // How other people react when this person is suggested to them.
     received: { shown: 0, liked: 0 },
     matches: { started: 0, replied: 0, firstMessages: 0, ghosted: 0, replyMin: 0, timed: 0 },
+    // "Did you meet?": this person's answers, by the other person's id...
+    dates: {},
+    // ...and what people who met this person answered about them (answer, reason).
+    dateReviews: {},
     observations: [],
     // Style words in the photos of people they liked and passed on (looks.js, Plus only).
     looks: { nLiked: 0, nPassed: 0, liked: {}, passed: {} },
@@ -104,7 +108,7 @@ export function noteDecision(store, user, other, { liked, shownAt }) {
   }
   bump((other.photos || []).length ? d.photos.with : d.photos.without, liked);
   bump(richness(other) >= 3 ? d.detail.rich : d.detail.sparse, liked);
-  bump(normalizeCity(user.basics.city) === normalizeCity(other.basics.city) ? d.distance.local : d.distance.away, liked);
+  bump(nearby(user.basics.city, other.basics.city) ? d.distance.local : d.distance.away, liked);
   const gap = Math.abs((user.basics.age || 0) - (other.basics.age || 0));
   bump(gap <= 3 ? d.ageGap.closer : d.ageGap.wider, liked);
   for (const k of TRAIT_KEYS) {
@@ -214,7 +218,7 @@ export function likeChance(sig, a, b) {
   const parts = [
     rate((b.photos || []).length ? d.photos.with : d.photos.without),
     rate(richness(b) >= 3 ? d.detail.rich : d.detail.sparse),
-    rate(normalizeCity(a.basics.city) === normalizeCity(b.basics.city) ? d.distance.local : d.distance.away),
+    rate(nearby(a.basics.city, b.basics.city) ? d.distance.local : d.distance.away),
     rate(Math.abs((a.basics.age || 0) - (b.basics.age || 0)) <= 3 ? d.ageGap.closer : d.ageGap.wider),
   ].filter((x) => x != null);
   return parts.length ? parts.reduce((x, y) => x + y, 0) / parts.length : null;
@@ -260,6 +264,7 @@ export function summarizeSignals(sig) {
     averageHoursToDecide: d.timed ? Math.round(mean(d.decideSec, d.timed) / 360) / 10 : null,
     revealedPreferences: revealedPreferences(sig),
     responsiveness: responsiveness(sig),
+    meetings: Object.values(sig.dates || {}),
     activeHoursUtc: sig.activeHours,
     observations: sig.observations.map((o) => o.text),
     looksFromPhotos: { decisions: sig.looks.nLiked + sig.looks.nPassed, leanings: lookLeanings(sig) },

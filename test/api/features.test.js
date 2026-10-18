@@ -78,6 +78,8 @@ test('settings: edit basics with validation, pause hides you', async () => {
   const { me } = await onboard(c);
   assert.equal((await c.put('/api/settings', { basics: { age: 12 } })).status, 400);
   assert.equal((await c.put('/api/settings', { basics: { seeking: 'aliens' } })).status, 400);
+  assert.equal((await c.put('/api/settings', { basics: { distance: 'mars' } })).status, 400);
+  assert.equal((await c.put('/api/settings', { basics: { distance: 'hours' } })).data.user.basics.distance, 'hours');
   const r = await c.put('/api/settings', { basics: { city: 'nyc', ageRange: 10, name: 'Zia J' } });
   assert.equal(r.data.user.basics.city, 'New York');
   assert.equal(r.data.user.name, 'Zia J');

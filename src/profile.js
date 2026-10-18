@@ -3,6 +3,7 @@
 //   shared: what potential matches see. The agent only *suggests* items; the person approves them.
 import { TRAITS, TRAIT_KEYS, CORE_TRAITS, TAGS, INTERESTS, ASPECTS, FACTS, FACT_KEYS, TAG_FACTS, clamp01, upgradeHidden } from './traits.js';
 import { now } from './clock.js';
+import { isVerified } from './verification.js';
 
 const MAX_NOTES = 40;
 const MAX_SHARED = 30;
@@ -138,6 +139,7 @@ export function upgradeUser(user) {
   upgradeHidden(user.hidden);
   user.shared.facts ||= {};
   user.shared.suggestedInterests ||= [];
+  user.shared.openers ||= [];
   return user;
 }
 
@@ -206,7 +208,7 @@ export function describeHidden(user) {
 // Search limits learned from passes, in plain words. Each one can be removed.
 export function describeLimits(l) {
   const out = [];
-  if (l.localOnly) out.push({ key: 'localOnly', text: 'Only people in your city' });
+  if (l.localOnly) out.push({ key: 'localOnly', text: 'Only people near you' });
   if (l.ageMin != null && l.ageMax != null) out.push({ key: 'age', text: `Ages ${l.ageMin} to ${l.ageMax}` });
   else if (l.ageMin != null) out.push({ key: 'age', text: `Older than ${l.ageMin - 1}` });
   else if (l.ageMax != null) out.push({ key: 'age', text: `Younger than ${l.ageMax + 1}` });
@@ -249,8 +251,10 @@ export function publicProfile(user, { showPhotos = false } = {}) {
     interests: user.shared.interests,
     facts: FACT_KEYS.filter((k) => user.shared.facts?.[k]?.status === 'approved').map((k) => ({ key: k, label: FACTS[k].label, value: user.shared.facts[k].value })),
     items: user.shared.items.filter((i) => i.status === 'approved').map(({ prompt, text }) => ({ prompt, text })),
+    openers: user.shared.openers || [],
     photos: showPhotos ? photos.map((p) => `/api/photos/${p.id}`) : [],
     photosHidden: !showPhotos && photos.length > 0,
+    ...(isVerified(user) ? { verified: true } : {}),
     ...(user.demo ? { demo: true } : {}),
   };
 }

@@ -12,12 +12,22 @@ export const BASICS = [
     id: 'b_gender', key: 'gender', text: 'First, a few basics so I only suggest people who fit. How do you describe yourself?',
     choices: ['Woman', 'Man', 'Non-binary'],
   },
-  { id: 'b_seeking', key: 'seeking', text: 'And who would you like to meet?', choices: ['Women', 'Men', 'Everyone'] },
+  { id: 'b_seeking', key: 'seeking', text: 'And who would you like to meet?', choices: ['Women', 'Men', 'Non-binary people', 'Everyone'] },
   { id: 'b_age', key: 'age', text: 'How old are you?' },
   { id: 'b_city', key: 'city', text: 'Which city are you in?' },
 ];
 
 export const QUESTIONS = [
+  {
+    // Asked early: it decides who can be suggested at all. Settings can change it later.
+    id: 'q_distance', mode: 'self', traits: [], early: true, skipIf: (u) => u.basics.distance != null,
+    text: 'Would you date someone who lives in another city?',
+    choices: [
+      { label: 'Only someone near me', ack: 'Close to home it is. I will keep to your area.', set: {}, basics: { distance: 'near' } },
+      { label: 'Up to a few hours away', ack: 'A few hours away is fine. Noted.', set: {}, basics: { distance: 'hours' } },
+      { label: 'Distance is no problem', ack: 'Open to long distance. Noted, I will still favour people closer by.', set: {}, basics: { distance: 'any' } },
+    ],
+  },
   {
     id: 'q_weekend', mode: 'self', share: 'My ideal Sunday',
     text: 'Describe a Sunday you would happily repeat every week.',
@@ -272,7 +282,7 @@ function passQuestion(event) {
     choices.push({ label: event.older ? 'A bit too old for me' : 'A bit too young for me', ack: 'Understood.', reason: 'age', then: { type: 'pass-age', ...base, age: event.age, older: event.older } });
   }
   if (event.away) {
-    choices.push({ label: 'Too far away', ack: 'Understood. From now on I will stick to people in your city.', reason: 'distance', limits: { localOnly: true } });
+    choices.push({ label: 'Too far away', ack: 'Understood. From now on I will stick to people near you.', reason: 'distance', limits: { localOnly: true } });
   }
   if (event.thin) {
     choices.push({ label: 'Their profile said too little', ack: 'Noted. I will favour people who share a little more about themselves.', reason: 'profile', limits: { prefersDetail: true } });
@@ -341,13 +351,45 @@ export function feedbackQuestion(event) {
       ],
     };
   }
-  if (event.type === 'checkin') {
-    return { id: `ci_${event.candidateId}`, mode: 'partner', text: `It has been a week since you matched with ${event.name}. Did you talk or meet? How is it going?` };
-  }
+  if (event.type === 'checkin') return metQuestion(event);
+  if (event.type === 'met-once') return metOnceQuestion(event);
   if (event.type === 'match') {
     return { id: `fbm_${event.candidateId}`, mode: 'partner', text: `You and ${event.name} matched. Once you have talked a bit, tell me how it feels.` };
   }
   return null;
+}
+
+// "Did you meet?" Quick replies, so the answer can teach matching something exact.
+// The route applies `met` and `metReason` (they need both people); `then` lines up the follow-up.
+function metQuestion(event) {
+  const { candidateId: cid, name } = event;
+  const text = event.again
+    ? `Last time you and ${name} were still talking. Did you meet in the end?`
+    : `It has been a week since you matched with ${name}. Did you meet?`;
+  return {
+    id: `ci_${cid}`, mode: 'partner', text,
+    choices: [
+      { label: 'Yes, and I want to see them again', ack: `That is lovely to hear. I will look for more people like ${name}.`, met: 'again' },
+      { label: 'Yes, but once was enough', ack: 'Thank you for telling me.', met: 'once', then: { type: 'met-once', candidateId: cid, name, aspects: event.aspects || [] } },
+      { label: 'Not yet, we are talking', ack: 'Good luck. I will ask again in a couple of weeks.', met: 'talking' },
+      { label: 'We did not really talk', ack: 'That happens. It does not count against anyone.', met: 'quiet' },
+    ],
+  };
+}
+
+function metOnceQuestion(event) {
+  const { candidateId: cid, name } = event;
+  const base = { cid, name };
+  const choices = [
+    { label: 'No spark in person', ack: 'Fair. Chemistry is hard to predict, even for me.', metReason: 'spark', then: { type: 'pass-spark', ...base } },
+    { label: 'They did not look like their photos', ack: 'Thank you. That is useful, and it stays private.', metReason: 'photos' },
+  ];
+  if (event.aspects?.length) choices.push({ label: 'Our lives felt different', ack: 'That helps.', metReason: 'lifestyle', then: { type: 'pass-lifestyle', ...base, aspects: event.aspects } });
+  choices.push(
+    { label: 'I did not feel safe', ack: `I am sorry. I have told our moderators, and they will look at ${name}'s account. If you are in danger, call your local emergency number.`, metReason: 'unsafe' },
+    { label: 'Something else', ack: 'Okay.', metReason: 'other', then: { type: 'pass-other', ...base } },
+  );
+  return { id: `mo_${cid}`, mode: 'partner', text: `What made once enough with ${name}?`, choices };
 }
 
 function cap(s) {
