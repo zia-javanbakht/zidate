@@ -8,9 +8,10 @@ export function gallery(photos, name) {
     src, alt: i === 0 ? `Photo of ${name}` : `${name}, photo ${i + 1}`, loading: i === 0 ? null : 'lazy', draggable: 'false',
   })));
   const box = h('div', { class: 'gallery', role: 'region', 'aria-roledescription': 'carousel', 'aria-label': `Photos of ${name}` }, track);
+  let at = 0;
+  box.current = () => at; // which photo is showing, for "Like this photo"
   if (photos.length < 2) return box;
 
-  let at = 0;
   const smooth = () => (matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
   const go = (i) => {
     const to = Math.max(0, Math.min(photos.length - 1, i));
@@ -55,9 +56,31 @@ export function gallery(photos, name) {
   return box;
 }
 
+// A like on one part of someone's profile, as a quote: a line, or one of their photos.
+function quote(on, alt) {
+  if (!on) return null;
+  return h('blockquote', { class: 'about' }, on.photo
+    ? h('img', { src: on.photo, alt, onerror: (e) => e.target.remove() })
+    : [on.prompt ? h('span', { class: 'prompt' }, on.prompt) : null, h('span', {}, on.text)]);
+}
+
 export function personCard(p, { onDecide, onReport } = {}) {
+  const open = onDecide && !p.matchId && !p.decision;
+  const pics = p.photos?.length ? gallery(p.photos, p.name) : null;
+  // Like one particular line or photo, with a note if you want: it gives them something to answer.
+  const likePart = async (on, what) => {
+    const v = await ask({
+      title: `Like ${p.name}'s ${what}`,
+      text: on.kind === 'item' ? `“${p.items[on.index].text}”` : 'They will see which photo you liked.',
+      fields: [{ name: 'note', label: 'Add a note (optional)', type: 'textarea', maxlength: 200, placeholder: 'Something they can answer' }],
+      confirm: 'Send like',
+    });
+    if (v) onDecide('like', [...card.querySelectorAll('.actions button, .heart')], { on, note: v.note });
+  };
+  const heart = (label, on, what) => h('button', { class: 'heart', type: 'button', 'aria-label': label, title: label, onclick: () => likePart(on, what) }, '♥');
   const card = h('article', { class: 'card person' },
-    p.photos?.length ? gallery(p.photos, p.name) : null,
+    pics,
+    open && pics ? h('p', { class: 'like-photo' }, h('button', { class: 'link small', type: 'button', onclick: () => likePart({ kind: 'photo', index: pics.current() }, 'photo') }, '♥ Like this photo')) : null,
     h('h2', {}, p.name),
     h('p', { class: 'meta' }, [p.age, p.city, p.demo ? 'demo profile' : null].filter(Boolean).join(' · ')),
     p.photosHidden ? h('p', { class: 'hint' }, `${p.name} shares photos after you match.`) : null,
@@ -65,7 +88,14 @@ export function personCard(p, { onDecide, onReport } = {}) {
     p.reason ? h('p', { class: 'why' }, p.reason) : null,
     p.facts?.length ? h('ul', { class: 'facts', 'aria-label': 'About' }, p.facts.map((f) => h('li', {}, h('span', {}, `${f.label}:`), f.value))) : null,
     p.interests?.length ? h('ul', { class: 'tags', 'aria-label': 'Interests' }, p.interests.map((i) => h('li', {}, i))) : null,
-    p.items?.length ? h('dl', { class: 'qa' }, p.items.flatMap((i) => [h('dt', {}, i.prompt || 'About me'), h('dd', {}, i.text)])) : null);
+    p.items?.length ? h('dl', { class: 'qa' }, p.items.flatMap((i, index) => [h('dt', {}, i.prompt || 'About me'),
+      h('dd', {}, i.text, open ? heart(`Like this line: ${i.prompt || 'About me'}`, { kind: 'item', index }, 'line') : null)])) : null);
+  if (p.likedYou) {
+    card.prepend(h('div', { class: 'liked-you' },
+      h('p', {}, h('strong', {}, p.likedYou.on ? `${p.name} liked your ${p.likedYou.on.photo ? 'photo' : 'line'}` : `${p.name} likes you`)),
+      quote(p.likedYou.on, 'Your photo'),
+      p.likedYou.note ? h('p', { class: 'note' }, `“${p.likedYou.note}”`) : null));
+  }
   if (onDecide) {
     if (p.matchId) {
       card.append(h('p', { class: 'decided' }, 'It is mutual. ', h('a', { href: `#/match/${encodeURIComponent(p.matchId)}` }, `Say hello to ${p.name}`)));
@@ -135,10 +165,10 @@ export async function week() {
     return;
   }
   const cards = data.picks.map((p) => personCard(p, {
-    onDecide: async (decision, buttons) => {
+    onDecide: async (decision, buttons, extra = {}) => {
       buttons.forEach((b) => (b.disabled = true));
       try {
-        const res = await api('POST', `/api/week/${encodeURIComponent(p.id)}`, { decision });
+        const res = await api('POST', `/api/week/${encodeURIComponent(p.id)}`, { decision, ...extra });
         if (res.match) {
           toast(`It is mutual. Say hello to ${p.name}.`);
           location.hash = `#/match/${encodeURIComponent(res.match.id)}`;
@@ -225,6 +255,7 @@ export async function thread(id) {
   };
   const add = (m) => {
     log.querySelector('.hello')?.remove();
+    if (m.about) log.append(h('div', { class: `liked ${m.mine ? 'user' : 'them'}` }, h('span', { class: 'small muted' }, m.mine ? 'You liked' : `${name} liked`), quote(m.about, m.mine ? `${name}'s photo` : 'Your photo')));
     log.append(h('p', { class: `msg ${m.mine ? 'user' : 'them'}` }, m.text, h('time', { datetime: m.at }, clock(m.at))));
     if (m.mine) lastMineAt = m.at;
     showSeen();
