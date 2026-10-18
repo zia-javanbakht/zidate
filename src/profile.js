@@ -167,6 +167,8 @@ export function settingsOf(user) {
   const s = user.settings;
   s.paused ??= false;
   s.photosAfterMatch ??= true;
+  s.matchDay ??= 1; // 0 = Sunday .. 6 = Saturday
+  s.timeZone ??= 'UTC';
   s.email ||= {};
   for (const k of ['picks', 'match', 'message']) s.email[k] ??= true;
   return s;

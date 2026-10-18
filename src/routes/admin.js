@@ -1,7 +1,7 @@
 // Moderation for the people listed in ADMIN_EMAILS.
 import { now } from '../clock.js';
 import { isReady } from '../profile.js';
-import { weekKey } from '../clock.js';
+import { currentWeek } from '../matching.js';
 
 export default function admin({ store, route, HttpError, endSessions, mailer }) {
   const who = (id) => {
@@ -39,7 +39,6 @@ export default function admin({ store, route, HttpError, endSessions, mailer }) 
 
   route('GET', '/api/admin/stats', async () => {
     const users = Object.values(store.data.users).filter((u) => !u.demo);
-    const wk = weekKey();
     const weekAgo = new Date(Date.parse(now().toISOString()) - 7 * 864e5).toISOString();
     const msgs = Object.values(store.data.messages).flat();
     return {
@@ -49,7 +48,7 @@ export default function admin({ store, route, HttpError, endSessions, mailer }) 
         paused: users.filter((u) => u.settings?.paused).length,
         suspended: users.filter((u) => u.suspended).length,
         demo: Object.values(store.data.users).length - users.length,
-        picksThisWeek: Object.keys(store.data.weeks).filter((k) => k.endsWith(`:${wk}`)).length,
+        picksThisWeek: users.filter((u) => store.data.weeks[`${u.id}:${currentWeek(u)}`]).length,
         matches: Object.keys(store.data.matches).length,
         messagesThisWeek: msgs.filter((m) => m.at > weekAgo).length,
         openReports: store.data.reports.filter((r) => (r.status || 'open') === 'open').length,
