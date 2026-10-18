@@ -117,12 +117,36 @@ function closed(store, a, b) {
   return Boolean(d.passes[`${b.id}>${a.id}`] || d.blocks[`${a.id}>${b.id}`] || d.blocks[`${b.id}>${a.id}`]);
 }
 
+// Each person picks the day their two arrive, at midnight in their own time zone.
+function schedule(user) {
+  const s = settingsOf(user);
+  return { day: s.matchDay, tz: s.timeZone };
+}
+
+// This person's current week. A change of day never repeats or skips a week:
+// the key never goes back past the week that was current when the day changed.
+export function currentWeek(user, date = now()) {
+  const sch = schedule(user);
+  const floor = settingsOf(user).weekFloor;
+  const wk = weekKey(date, sch);
+  return floor && floor > wk ? floor : wk;
+}
+
+export function nextWeek(user, date = now()) {
+  const sch = schedule(user);
+  const cur = currentWeek(user, date);
+  let next = nextWeekStart(date, sch);
+  while (weekKey(next, sch) <= cur) next = nextWeekStart(next, sch);
+  return next;
+}
+
 // Get (or create, once per week) this person's suggestions.
 export function weeklyPicks(store, user) {
-  const wk = weekKey();
+  const wk = currentWeek(user);
   const key = `${user.id}:${wk}`;
+  const nextAt = nextWeek(user).toISOString();
   // Paused people see that state instead of suggestions; anything already decided this week is kept.
-  if (settingsOf(user).paused) return { week: wk, ready: isReady(user), paused: true, picks: [], next: nextWeekStart().toISOString() };
+  if (settingsOf(user).paused) return { week: wk, ready: isReady(user), paused: true, picks: [], next: nextAt };
   let week = store.data.weeks[key];
   if (!week) {
     if (!isReady(user)) {
@@ -130,7 +154,7 @@ export function weeklyPicks(store, user) {
       const missing = basicsDone(user)
         ? TRAIT_KEYS.filter((k) => user.hidden.traits[k].confidence < 0.25).slice(0, 3).map((k) => TOPICS[k])
         : ['a few basics (who you are looking for, your age and city)'];
-      return { week: wk, ready: false, missing, picks: [], next: nextWeekStart().toISOString() };
+      return { week: wk, ready: false, missing, picks: [], next: nextAt };
     }
     const seen = everSuggested(store, user.id);
     const ranked = Object.values(store.data.users)
@@ -146,7 +170,7 @@ export function weeklyPicks(store, user) {
   return {
     week: wk,
     ready: true,
-    next: nextWeekStart().toISOString(),
+    next: nextAt,
     picks: week.picks
       .filter((p) => store.data.users[p.id])
       .map((p) => {
@@ -169,7 +193,7 @@ export function runWeekly(store, notify) {
   let made = 0;
   for (const u of Object.values(store.data.users)) {
     if (u.demo || inactive(u) || !isReady(u)) continue;
-    const key = `${u.id}:${weekKey()}`;
+    const key = `${u.id}:${currentWeek(u)}`;
     if (store.data.weeks[key]) continue;
     const res = weeklyPicks(store, u);
     if (res.picks.length) {

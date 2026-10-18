@@ -3,7 +3,8 @@ import crypto from 'node:crypto';
 import { hashPassword, verifyPassword } from '../auth.js';
 import { cleanText, settingsOf, describeHidden } from '../profile.js';
 import { normalizeCity } from '../cities.js';
-import { now } from '../clock.js';
+import { now, validTimeZone } from '../clock.js';
+import { currentWeek } from '../matching.js';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TOKEN_TTL = { verify: 7 * 864e5, reset: 3600e3 };
@@ -63,6 +64,8 @@ export default function account(ctx) {
     checkPassword(password);
     if (Object.values(store.data.users).some((u) => u.email === email)) throw new HttpError(409, 'That email already has an account. Try signing in.');
     const user = newUser({ name, email, password });
+    // Weekly picks arrive at midnight in the person's own time zone, as their browser reports it.
+    if (validTimeZone(body.timeZone)) settingsOf(user).timeZone = body.timeZone;
     sendVerify(user);
     return { status: 201, body: { user: meView(user) }, headers: { 'Set-Cookie': startSession(user) } };
   }, { auth: false });
@@ -144,6 +147,17 @@ export default function account(ctx) {
     if (typeof body.paused === 'boolean') s.paused = body.paused;
     if (typeof body.photosAfterMatch === 'boolean') s.photosAfterMatch = body.photosAfterMatch;
     for (const k of ['picks', 'match', 'message']) if (typeof body.email?.[k] === 'boolean') s.email[k] = body.email[k];
+    // Which day the weekly two arrive, in the person's own time zone.
+    const day = body.matchDay === undefined ? s.matchDay : Number(body.matchDay);
+    if (!Number.isInteger(day) || day < 0 || day > 6) throw new HttpError(400, 'Pick a day of the week.');
+    const tz = body.timeZone === undefined ? s.timeZone : String(body.timeZone);
+    if (!validTimeZone(tz)) throw new HttpError(400, 'That time zone is not recognised.');
+    if (day !== s.matchDay || tz !== s.timeZone) {
+      // Keep the week that is current now, so changing the day cannot repeat or skip one.
+      s.weekFloor = currentWeek(user);
+      s.matchDay = day;
+      s.timeZone = tz;
+    }
     const b = body.basics || {};
     if (b.name !== undefined) {
       const name = cleanText(b.name, 40);

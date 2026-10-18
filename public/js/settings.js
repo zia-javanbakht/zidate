@@ -59,6 +59,25 @@ export async function settings() {
       if (!(await save({ photosAfterMatch: v }))) el.checked = !v;
     }));
 
+  // --- weekly day ---
+  const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const here = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const day = field({ id: 's-day', label: 'They arrive on', type: 'select', value: String(s.matchDay ?? 1), options: DAYS.map((d, i) => [String(i), d]) });
+  day.input.onchange = async () => {
+    const v = Number(day.input.value);
+    if (await save({ matchDay: v, timeZone: here }, `Saved. Your two will arrive on ${DAYS[v]}s.`)) settings();
+    else day.input.value = String(s.matchDay ?? 1);
+  };
+  const useHere = h('button', { class: 'link small', type: 'button' }, `Use ${here}`);
+  useHere.onclick = async () => {
+    if (await save({ timeZone: here })) settings();
+  };
+  const weekly = h('section', { class: 'card' },
+    h('h2', {}, 'Weekly suggestions'),
+    day.node,
+    h('p', { class: 'hint' }, `At midnight, ${s.timeZone.replace(/_/g, ' ')} time. A change starts with your next two, so you never miss or repeat a week. `,
+      s.timeZone !== here ? useHere : null));
+
   const emails = h('section', { class: 'card' },
     h('h2', {}, 'Emails'),
     h('p', { class: 'hint' }, 'Only sent when you do not have ziDate open.'),
@@ -135,6 +154,7 @@ export async function settings() {
     h('h1', {}, 'Settings'),
     verifyBanner,
     h('section', { class: 'card' }, h('h2', {}, 'Basics'), basicsForm),
+    weekly,
     privacy,
     emails,
     h('section', { class: 'card' }, h('h2', {}, 'Appearance'), h('div', {}, seg)),

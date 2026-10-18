@@ -296,3 +296,26 @@ test('notifications can be marked read', async () => {
   assert.equal((await a.get('/api/me')).data.user.notifications, 0);
   await s.close();
 });
+
+test('each person picks the day their two arrive', async () => {
+  const fresh = client(srv.base);
+  await fresh.post('/api/signup', { name: 'Day', email: `day${Math.random()}@x.co`, password: 'password1', timeZone: 'Europe/London' });
+  let s = (await fresh.get('/api/me')).data.user.settings;
+  assert.equal(s.matchDay, 1);
+  assert.equal(s.timeZone, 'Europe/London');
+  const c = client(srv.base);
+  await onboard(c);
+  const before = (await c.get('/api/week')).data;
+  assert.equal((await c.put('/api/settings', { matchDay: 7 })).status, 400);
+  assert.equal((await c.put('/api/settings', { timeZone: 'Mars/Olympus' })).status, 400);
+  const day = (new Date().getUTCDay() + 3) % 7;
+  s = (await c.put('/api/settings', { matchDay: day, timeZone: 'Asia/Tokyo' })).data.user.settings;
+  assert.equal(s.matchDay, day);
+  assert.equal(s.timeZone, 'Asia/Tokyo');
+  // The current pair stays; the next one comes on the new day.
+  const after = (await c.get('/api/week')).data;
+  assert.deepEqual(after.picks.map((p) => p.id), before.picks.map((p) => p.id));
+  const next = new Date(after.next);
+  assert.equal(new Date(next.getTime() + 9 * 3600e3).getUTCDay(), day);
+  assert.equal(new Date(next.getTime() + 9 * 3600e3).getUTCHours(), 0);
+});
