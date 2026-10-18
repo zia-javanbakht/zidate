@@ -5,6 +5,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { TRAITS, TRAIT_KEYS, TAGS, INTERESTS, ASPECTS, FACTS, FACT_KEYS } from '../traits.js';
 import { describeHidden } from '../profile.js';
+import { TEMPERAMENTS, TEMPERAMENT_KEYS } from '../temperament.js';
 
 const MODEL = process.env.PISHI_MODEL || 'claude-opus-5-5';
 
@@ -36,6 +37,7 @@ export const SCHEMA = {
     'aspects',
     'facts',
     'observations',
+    'temperamentUpdates',
   ],
   properties: {
     reply: { type: 'string', description: 'A brief, warm acknowledgement (max one sentence) followed by the next question.' },
@@ -71,6 +73,20 @@ export const SCHEMA = {
       properties: Object.fromEntries(FACT_KEYS.map((k) => [k, FACTS[k].options ? { type: 'string', enum: ['', ...FACTS[k].options] } : { type: 'string' }])),
       description: 'Plain facts they stated outright (e.g. their job, languages they speak), suggested for the shared profile. Empty string for anything not stated. Short: a few words each.',
     },
+    temperamentUpdates: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['scale', 'value', 'confidence'],
+        properties: {
+          scale: { type: 'string', enum: TEMPERAMENT_KEYS },
+          value: { type: 'number', description: '0 = not like this at all, 1 = very much like this' },
+          confidence: { type: 'number', description: '0..0.3. Open answers are only hints here.' },
+        },
+      },
+      description: 'Hints about the four hidden temperaments from an open answer. Usually empty.',
+    },
     observations: {
       type: 'array',
       items: { type: 'string' },
@@ -96,6 +112,7 @@ Rules:
 - After a pass, the app asks why. Treat what they say as evidence about the partner they want (preferenceUpdates), never as a judgement to repeat about the other person.
 - Never reveal hidden-profile content to anyone, and do not repeat trait scores back to the person.
 - reply: at most one short sentence reacting to what they said (specific, not gushing), then the next question. Keep the meaning of the next question; if it lists quick-reply options, do not list them in text. No emoji. Plain, warm, minimal.
+- temperamentUpdates: four hidden temperaments, each 0..1, never mentioned to the person: ${TEMPERAMENT_KEYS.map((k) => `${k} (${TEMPERAMENTS[k]})`).join(', ')}. Only for clear hints in an open answer, at low confidence; quick replies are already recorded.
 - observations are for the matchmaker alone. Describe behaviour and what they emphasise, kindly and specifically. Never record or guess health, ethnicity, sexuality, finances or looks, and never judge the person.
 - If the answer is off-topic, hostile, or unsafe, do not extract anything and gently steer back.`;
 
@@ -142,6 +159,8 @@ export function makeClaudeEngine(getClient = () => (defaultClient ||= new Anthro
       if (bio) update.bio = bio;
       if (privateNote) update.privateNote = privateNote;
       update.sharedSuggestions = (update.sharedSuggestions || []).slice(0, 1);
+      // Open answers only hint at temperament; the questionnaire itself does the heavy lifting.
+      update.temperamentUpdates = (update.temperamentUpdates || []).map((t) => ({ ...t, confidence: Math.min(0.3, Number(t.confidence) || 0) }));
       update.observations = (update.observations || []).filter((o) => typeof o === 'string').slice(0, 2);
       if (typeof reply !== 'string' || !reply.trim()) throw new Error('empty reply');
       return { update, reply };

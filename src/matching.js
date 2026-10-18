@@ -4,6 +4,7 @@ import { basicsDone } from './profile.js';
 import { isReady, publicProfile, settingsOf } from './profile.js';
 import { normalizeCity } from './cities.js';
 import { weekKey, nextWeekStart, now } from './clock.js';
+import { pishiFit, fitWeight } from './temperament.js';
 import { revealedPreferences, likeChance, responsiveness, popularity, hoursOverlap, noteShown, reportCounts } from './signals.js';
 
 export const PER_WEEK = 2;
@@ -105,7 +106,10 @@ export function compatibility(a, b) {
   const x = fit(a, b);
   const y = fit(b, a);
   // Geometric mean punishes one-sided matches.
-  return Math.sqrt(x * y);
+  const base = Math.sqrt(x * y);
+  // Blend in how well their temperaments go together, as far as we know them.
+  const w = fitWeight(a, b);
+  return w ? base * (1 - w) + pishiFit(a, b) * w : base;
 }
 
 // Adjustment from what people do rather than what they say (see signals.js).

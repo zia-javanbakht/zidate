@@ -134,6 +134,7 @@ export function about() {
     p('The shared profile is what your matches see. Your matchmaker only suggests lines for it; nothing appears until you approve it, and you can write your own.'),
     p('The hidden profile is how I choose people for you: personality, values, dealbreakers and what you want in a partner. Only you can see it, under You, and you can correct anything that is wrong.'),
     p('I also learn from what you do: who you like and pass on, how conversations with matches go, and when you are usually around. These signals are only used to choose people for you. They are not shown in the app, and they are included when you download your data.'),
+    p('Some of my quick questions ("a free Saturday feels…") place you on four temperaments: how much you seek novelty, steadiness, direction and warmth. They help me judge which two people would go well together. Like the signals, they are not shown in the app and are included in your data download.'),
     h('h2', {}, 'Two people a week'),
     p('Every Monday you get two suggestions, people in your city first. Like or pass, and tell me why: it makes the next pair better. When you both like each other, you can talk.'),
     h('h2', {}, 'Privacy and safety'),

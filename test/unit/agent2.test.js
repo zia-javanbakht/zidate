@@ -5,6 +5,7 @@ import { QUESTIONS, DEEPER } from '../../src/agent/questions.js';
 import { mockEngine } from '../../src/agent/mock.js';
 import { emptyHidden } from '../../src/traits.js';
 import { normalizeCity } from '../../src/cities.js';
+import { TEMPERAMENT_ITEMS } from '../../src/temperament.js';
 import { summarize } from '../../src/profile.js';
 import * as clock from '../../src/clock.js';
 
@@ -15,7 +16,7 @@ function user() {
 test('after the core interview, the matchmaker keeps going deeper where it knows least', () => {
   const u = user();
   const convo = newConversation();
-  convo.asked = QUESTIONS.map((q) => q.id);
+  convo.asked = [...QUESTIONS, ...TEMPERAMENT_ITEMS].map((q) => q.id);
   for (const k of Object.keys(u.hidden.traits)) u.hidden.traits[k].confidence = 0.8;
   u.hidden.traits.spirituality.confidence = 0.1;
   const q = nextQuestion(u, convo);

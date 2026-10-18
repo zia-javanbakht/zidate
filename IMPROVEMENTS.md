@@ -123,3 +123,9 @@ Asked for: guide people to complete both profiles; keep a much more detailed rec
 | # | Area | What changed | Verified by |
 |---|---|---|---|
 | 90 | Brand | The logo is now an 80s-style pixel cat, hand-drawn on a 32 x 32 grid: a sitting cat whose raised tail curls over its head into a question mark. Same rose palette plus a pale pink for whiskers and eye glints, a one-colour version (logo-mono.svg), and the favicon and app icons rendered at whole-pixel multiples so they stay crisp. The header and welcome page show it at 32 and 128 px for the same reason. | Rendered at 512, 192, 128, 64 and 32 px |
+
+## Temperaments (91)
+
+| # | Area | What changed | Verified by |
+|---|---|---|---|
+| 91 | Matching | A hidden questionnaire (src/temperament.js): twelve quick-reply questions that place each person on four independent temperaments, Spark (novelty, play), Anchor (steadiness, loyalty), Compass (direction, decisiveness) and Hearth (warmth, empathy). Once matching has started, the matchmaker asks one after each open question, about the temperament it knows least; Claude may add low-confidence hints from open answers. Never shown to anyone, the person included; disclosed on the About page and in the data export. Pairs get a Pishi Fit score (0.5 tempo similarity + 0.3 head-and-heart balance + 0.2 warmth, minus a clash when both lead strongly) that counts for up to a fifth of the match score as both people's answers build up. Demo people have temperaments. | Unit tests |

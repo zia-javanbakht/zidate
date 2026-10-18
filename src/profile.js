@@ -3,6 +3,7 @@
 //   shared: what potential matches see. The agent only *suggests* items; the person approves them.
 import { TRAITS, TRAIT_KEYS, CORE_TRAITS, TAGS, INTERESTS, ASPECTS, FACTS, FACT_KEYS, TAG_FACTS, clamp01, upgradeHidden } from './traits.js';
 import { now } from './clock.js';
+import { TEMPERAMENT_KEYS } from './temperament.js';
 
 const MAX_NOTES = 40;
 const MAX_SHARED = 30;
@@ -68,6 +69,10 @@ export function applyUpdate(user, update) {
   for (const p of update.preferenceUpdates || []) {
     if (!TRAIT_KEYS.includes(p.trait)) continue;
     hidden.preference[p.trait] = blendTrait(hidden.preference[p.trait] || { value: 0.5, confidence: 0 }, p.value, p.confidence);
+  }
+  for (const t of update.temperamentUpdates || []) {
+    if (!TEMPERAMENT_KEYS.includes(t.scale)) continue;
+    hidden.temperament[t.scale] = blendTrait(hidden.temperament[t.scale], t.value, t.confidence);
   }
   const newTags = (update.tags || []).map((t) => String(t).toLowerCase());
   removeConflicting(hidden.tags, newTags);
