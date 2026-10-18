@@ -185,3 +185,27 @@ test('widening tops up a short week and keeps decisions already made', async () 
   assert.equal(w.picks.find((p) => p.id === near.id).decision, 'like');
   assert.equal(w.widen, false);
 });
+
+test('nudges skip a step they just nudged and reach the dealbreakers too', async () => {
+  const store = new Store(null);
+  const u = person(store);
+  const convo = store.data.conversations[u.id];
+  convo.flags.readyAnnounced = true;
+  u.photos = [{ id: 'p' }];
+  u.shared.bio = 'Hi.';
+  for (let i = 0; i < 3; i++) u.shared.items.push({ id: `i${i}`, text: 'x', status: 'approved' });
+  u.shared.facts = { work: { value: 'Nurse', status: 'approved' }, kids: { value: 'Wants kids', status: 'approved' }, pets: { value: 'No pets', status: 'approved' } };
+  u.shared.interests = ['hiking', 'music', 'films'];
+  convo.flags.sinceNudge = 5;
+  opening(u, convo);
+  const { mockEngine } = await import('../../src/agent/mock.js');
+  await respond(u, convo, 'I like long walks.', mockEngine);
+  const nudge = convo.messages.find((m) => m.notice === 'guide');
+  assert.equal(nudge?.link, '#/profile/dealbreakers');
+});
+
+test('an automatic recheck does not claim the person said something was wrong', async () => {
+  const { feedbackQuestion } = await import('../../src/agent/questions.js');
+  assert.match(feedbackQuestion({ type: 'recheck', trait: 'social', auto: true }).text, /pointed two ways/);
+  assert.match(feedbackQuestion({ type: 'recheck', trait: 'social' }).text, /got something wrong/);
+});

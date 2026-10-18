@@ -166,6 +166,11 @@ export async function profile(section = '') {
     h('div', { id: 'lines', class: 'stack' }, ...itemNodes),
     h('div', { class: 'item' }, h('button', { class: 'btn small ghost', onclick: addLine }, '+ Add a line of my own')),
     h('div', { class: 'item', id: 'interests' }, h('div', { class: 'prompt' }, 'Interests'),
+      shared.suggestedInterests?.length ? h('div', { class: 'stack' },
+        h('p', { class: 'small muted' }, `You mentioned ${shared.suggestedInterests.join(', ')}. Show ${shared.suggestedInterests.length > 1 ? 'them' : 'it'} on your profile?`),
+        h('div', { class: 'row' },
+          h('button', { class: 'btn small', onclick: act(async () => { await api('POST', '/api/profile/interests/suggested', { action: 'add' }); reload(); }) }, shared.suggestedInterests.length > 1 ? 'Show them' : 'Show it'),
+          h('button', { class: 'btn small ghost', onclick: act(async () => { await api('POST', '/api/profile/interests/suggested', { action: 'dismiss' }); reload(); }) }, 'Not these'))) : null,
       h('ul', { class: 'tags' },
         shared.interests.map((i) => h('li', {}, i, h('button', { 'aria-label': `Remove ${i}`, onclick: act(async () => { await api('DELETE', `/api/profile/interests/${encodeURIComponent(i)}`); reload(); }) }, '×'))),
         shared.interests.length < 12 ? h('li', {}, h('button', { class: 'add-tag', onclick: addInterest }, '+ Add')) : null)));

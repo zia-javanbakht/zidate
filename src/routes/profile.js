@@ -146,7 +146,17 @@ export default function profile({ store, route, HttpError, meView, photos, seria
       if (user.shared.interests.length >= 12) throw new HttpError(400, 'Twelve is the limit. Remove one first.');
       user.shared.interests.push(name);
     }
+    user.shared.suggestedInterests = (user.shared.suggestedInterests || []).filter((i) => i !== name);
     return { body: { interests: user.shared.interests } };
+  });
+
+  // Interests the matchmaker heard: add them all, or let them go.
+  route('POST', '/api/profile/interests/suggested', async ({ user, body }) => {
+    const s = user.shared;
+    const take = body.action === 'add' ? (s.suggestedInterests || []).filter((i) => !s.interests.includes(i)) : [];
+    s.interests = [...s.interests, ...take].slice(0, 12);
+    s.suggestedInterests = [];
+    return { body: { interests: s.interests } };
   });
 
   route('DELETE', '/api/profile/interests/:name', async ({ user, params }) => {

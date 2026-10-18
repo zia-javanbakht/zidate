@@ -80,7 +80,10 @@ export function fit(a, b) {
   let score = den ? num / den : 0.5;
   // Shared values and interests are a modest bonus.
   const overlap = (x, y) => (x.length && y.length ? x.filter((v) => y.includes(v)).length / Math.min(x.length, y.length) : 0);
-  score = score * 0.8 + overlap(a.hidden.values, b.hidden.values) * 0.1 + overlap(a.shared.interests, b.shared.interests) * 0.1;
+  // Interests they mentioned count for matching even before they show them; only approved
+  // ones are ever named to the other person (see reason()).
+  const said = (u) => [...u.shared.interests, ...(u.shared.suggestedInterests || [])];
+  score = score * 0.8 + overlap(a.hidden.values, b.hidden.values) * 0.1 + overlap(said(a), said(b)) * 0.1;
   if (sameCity(a, b)) score += 0.05;
   // Small nudges from the categorical parts of the hidden profile.
   const [la, lb] = [a.hidden.aspects?.loveLanguage, b.hidden.aspects?.loveLanguage];

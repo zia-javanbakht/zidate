@@ -35,7 +35,8 @@ test('the interview fills both profiles and unlocks matching', async () => {
   const { data } = await c.get('/api/profile');
   assert.ok(data.shared.items.length >= 2, 'agent suggested shared lines');
   assert.ok(data.shared.items.every((i) => i.status === 'suggested'));
-  assert.ok(data.shared.interests.length >= 2);
+  assert.ok(data.shared.suggestedInterests.length >= 2, 'interests are suggested');
+  assert.equal(data.shared.interests.length, 0, 'and not public until approved');
   assert.ok(data.hidden.traits.filter((t) => t.confidence > 0.2).length >= 5);
   assert.ok(data.hidden.tags.includes('wants-kids') || data.hidden.tags.includes('non-smoker'));
   assert.equal(data.preview.items.length, 0, 'nothing public until approved');

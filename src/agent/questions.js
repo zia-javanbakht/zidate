@@ -330,7 +330,9 @@ export function feedbackQuestion(event) {
     const t = TRAITS[event.trait];
     return {
       id: `rc_${event.trait}`, mode: 'self',
-      text: `You said I got something wrong. Help me fix it: which sounds more like you?`,
+      text: event.auto
+        ? 'Your answers have pointed two ways on this, so let me just ask: which sounds more like you?'
+        : 'You said I got something wrong. Help me fix it: which sounds more like you?',
       traits: [event.trait],
       choices: [
         { label: cap(t.low), ack: 'Thank you, fixed.', set: { [event.trait]: 0.15 } },

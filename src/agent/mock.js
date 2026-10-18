@@ -34,7 +34,7 @@ export function draftBio(user) {
     .sort((a, b) => Math.abs(t[b].value - 0.5) * t[b].confidence - Math.abs(t[a].value - 0.5) * t[a].confidence)
     .slice(0, 2)
     .map((k) => (t[k].value > 0.5 ? TRAITS[k].high : TRAITS[k].low));
-  const interests = user.shared.interests.slice(0, 3);
+  const interests = [...user.shared.interests, ...(user.shared.suggestedInterests || [])].slice(0, 3);
   const parts = [];
   if (strong.length) parts.push(cap(strong.join(', ')) + '.');
   if (interests.length) {

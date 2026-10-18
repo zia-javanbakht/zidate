@@ -177,7 +177,7 @@ export async function respond(user, convo, rawText, engine = pickEngine(), signa
     if (!before || convo.flags.rechecked[t.trait]) continue;
     if (before.confidence >= 0.45 && t.confidence >= 0.3 && Math.abs(t.value - before.value) > 0.55) {
       convo.flags.rechecked[t.trait] = true;
-      queueEvent(convo, { type: 'recheck', trait: t.trait });
+      queueEvent(convo, { type: 'recheck', trait: t.trait, auto: true });
     }
   }
   const { observations, ...update } = result.update;
@@ -208,15 +208,16 @@ const NUDGES = {
   review: 'I have suggested some lines for your shared profile. They only appear once you approve them.',
   facts: 'A few plain facts, like your work or whether you want kids, save your matches a lot of guessing.',
   interests: 'Add a few interests so I can tell your matches what you have in common.',
-  partner: 'I would like to know more about who you hope to meet. Tell me about the last person you really clicked with?',
   dealbreakers: 'Is there anything you could never accept in a partner? You can set dealbreakers on your profile.',
 };
 
 function guideNudge(user, convo) {
   convo.flags.sinceNudge = (convo.flags.sinceNudge || 0) + 1;
   if (convo.flags.sinceNudge < NUDGE_EVERY) return;
-  const step = profileGuide(user).next;
-  if (!step || !NUDGES[step.id] || step.action.href === '#/talk' || convo.flags.lastNudge === step.id) return;
+  // The first open step worth a nudge. Steps done by talking are left to the interview itself.
+  const g = profileGuide(user);
+  const step = [...g.shared.steps, ...g.hidden.steps].find((s) => !s.done && NUDGES[s.id] && s.action.href !== '#/talk' && s.id !== convo.flags.lastNudge);
+  if (!step) return;
   convo.flags.sinceNudge = 0;
   convo.flags.lastNudge = step.id;
   convo.messages.push({ role: 'agent', notice: 'guide', text: NUDGES[step.id], link: step.action.href, label: step.action.label, at: now().toISOString() });

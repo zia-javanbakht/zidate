@@ -84,8 +84,10 @@ export function applyUpdate(user, update) {
   }
 
   const shared = user.shared;
-  addUnique(shared.interests, update.interests, INTERESTS);
-  shared.interests = shared.interests.slice(0, 12);
+  // Interests heard in the conversation are suggestions too: they only go public once approved.
+  shared.suggestedInterests ||= [];
+  addUnique(shared.suggestedInterests, (update.interests || []).filter((i) => !shared.interests.includes(String(i).toLowerCase())), INTERESTS);
+  shared.suggestedInterests = shared.suggestedInterests.slice(-12);
   for (const s of update.sharedSuggestions || []) {
     const text = cleanText(s.text, 300);
     if (!text || hasContactInfo(text)) continue;
@@ -135,6 +137,7 @@ export function suggestFacts(user, facts) {
 export function upgradeUser(user) {
   upgradeHidden(user.hidden);
   user.shared.facts ||= {};
+  user.shared.suggestedInterests ||= [];
   return user;
 }
 
