@@ -78,7 +78,7 @@ p { margin: 0; }
   border-bottom: 1px solid var(--line);
 }
 .mark { font-family: var(--serif); font-size: 1.35rem; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
-.mark img { width: 30px; height: 30px; }
+.mark img { width: 32px; height: 32px; image-rendering: pixelated; }
 nav { display: flex; gap: 4px; }
 nav a {
   position: relative; text-decoration: none; color: var(--muted);
@@ -117,7 +117,7 @@ label { display: block; font-size: .875rem; color: var(--muted); margin-bottom: 
 
 /* Welcome */
 .welcome { min-height: 80dvh; display: flex; flex-direction: column; justify-content: center; gap: 28px; }
-.welcome .logo { width: 112px; height: 112px; }
+.welcome .logo { width: 128px; height: 128px; image-rendering: pixelated; }
 .welcome .lede { font-size: 1.15rem; color: var(--muted); max-width: 30ch; }
 .how { display: grid; gap: 10px; padding: 0; margin: 0; list-style: none; counter-reset: s; }
 .how li { counter-increment: s; display: flex; gap: 12px; color: var(--muted); }

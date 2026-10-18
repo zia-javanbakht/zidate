@@ -1,6 +1,6 @@
 # Pishi
 
-<img src="public/logo.svg" alt="Pishi logo, a pink cat" width="112">
+<img src="public/logo.svg" alt="Pishi logo, a pink pixel cat" width="128">
 
 Pishi means cat in Farsi.
 

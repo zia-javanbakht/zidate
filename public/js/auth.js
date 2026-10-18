@@ -44,7 +44,7 @@ export function welcome() {
 
   render(h('section', { class: 'welcome' },
     h('div', { class: 'stack' },
-      h('img', { class: 'logo', src: '/logo.svg', alt: 'Pishi', width: 112, height: 112 }),
+      h('img', { class: 'logo', src: '/logo.svg', alt: 'Pishi', width: 128, height: 128 }),
       h('h1', {}, 'Two people a week.', h('br'), h('span', { class: 'muted' }, 'Chosen through conversation.')),
       h('p', { class: 'lede' }, 'No swiping. Talk with your matchmaker, decide what others see, and meet two people each week.')),
     h('ol', { class: 'how' },
