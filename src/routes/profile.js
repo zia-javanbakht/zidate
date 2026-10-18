@@ -30,7 +30,7 @@ export const OPENERS = [
 ];
 export const MAX_OPENERS = 3;
 
-export default function profile({ store, route, HttpError, meView, photos, serial, onPhotoAdded }) {
+export default function profile({ store, route, HttpError, meView, photos, looks, serial, onPhotoAdded }) {
   route('GET', '/api/profile', async ({ user }) => ({
     body: {
       shared: user.shared,
@@ -231,6 +231,8 @@ export default function profile({ store, route, HttpError, meView, photos, seria
     if (error) throw new HttpError(400, error);
     const id = photos.save(buf, type);
     user.photos.push({ id, at: new Date().toISOString() });
+    // Described once now, in the background, for members with Pishi Plus (looks.js).
+    looks.describe(id, user.id);
     onPhotoAdded(user, id);
     return { status: 201, body: { photo: { id, url: `/api/photos/${id}` } } };
   }, { bodyLimit: 4.5 * 1024 * 1024 });
@@ -240,6 +242,7 @@ export default function profile({ store, route, HttpError, meView, photos, seria
     user.photos = (user.photos || []).filter((p) => p.id !== params.id);
     if (user.photos.length === before) throw new HttpError(404, 'Not found.');
     photos.remove(params.id);
+    looks.forgetPhoto(params.id);
     return { body: { ok: true } };
   });
 

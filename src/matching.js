@@ -4,6 +4,7 @@ import { basicsDone } from './profile.js';
 import { isReady, publicProfile, settingsOf } from './profile.js';
 import { distanceKm, NEARBY_KM, FEW_HOURS_KM } from './cities.js';
 import { weekKey, nextWeekStart, now } from './clock.js';
+import { lookBoost } from './looks.js';
 import { dateRating, photoMismatches } from './dates.js';
 import { waitingOn } from './turns.js';
 import { revealedPreferences, likeChance, responsiveness, popularity, hoursOverlap, noteShown, reportCounts } from './signals.js';
@@ -177,6 +178,8 @@ export function signalBoost(store, a, b, reports = reportCounts(store)) {
   boost -= Math.min(0.12, Math.max(0, photoMismatches(sb) - 1) * 0.04);
   const hours = hoursOverlap(sa, sb);
   if (hours != null) boost += (hours - 0.5) * 0.04;
+  // Pishi Plus: the styles a has gone for in photos.
+  boost += lookBoost(store, a, b);
   return boost;
 }
 

@@ -12,7 +12,7 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TOKEN_TTL = { verify: 7 * 864e5, reset: 3600e3 };
 
 export default function account(ctx) {
-  const { store, route, HttpError, meView, startSession, endSessions, cookie, mailer, baseUrl, photos, newUser } = ctx;
+  const { store, route, HttpError, meView, startSession, endSessions, cookie, mailer, baseUrl, photos, looks, newUser } = ctx;
 
   // Per-account lockout on top of the per-address rate limit, so guessing from many places fails too.
   const fails = new Map();
@@ -217,7 +217,7 @@ export default function account(ctx) {
       // Kept only for matching and never shown in the app; included here because it is yours.
       // What people who met you said stays theirs: only how many answered is included.
       matchingSignals: { summary: summarizeSignals(signalsOf(store, user.id)), raw: { ...signalsOf(store, user.id), dateReviews: { count: Object.keys(signalsOf(store, user.id).dateReviews).length } } },
-      photos: (user.photos || []).map((p) => p.id),
+      photos: (user.photos || []).map((p) => ({ id: p.id, describedAs: store.data.photoLooks?.[p.id]?.tags || null })),
       photoVerification: user.verification ? { status: user.verification.status, at: user.verification.at, checkedPhotos: user.verification.photoIds } : null,
       conversationWithMatchmaker: store.data.conversations[user.id]?.messages || [],
       datePlans: Object.values(store.data.dates || {}).filter((d) => d.userId === user.id),
@@ -241,7 +241,10 @@ export default function account(ctx) {
 
   route('DELETE', '/api/me', async ({ user }) => {
     const id = user.id;
-    for (const p of user.photos || []) photos.remove(p.id);
+    for (const p of user.photos || []) {
+      photos.remove(p.id);
+      looks.forgetPhoto(p.id);
+    }
     if (user.verification?.selfieId) photos.remove(user.verification.selfieId);
     delete store.data.users[id];
     delete store.data.conversations[id];

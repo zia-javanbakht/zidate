@@ -9,7 +9,7 @@ import { screenMessage } from '../moderation.js';
 import { settingsOf } from '../profile.js';
 
 export default function week(ctx) {
-  const { store, route, HttpError, serial } = ctx;
+  const { store, route, HttpError, serial, looks } = ctx;
 
   route('GET', '/api/week', async ({ user }) => ({ body: weeklyPicks(store, user) }), { saves: true });
 
@@ -44,6 +44,8 @@ export default function week(ctx) {
     const liked = decision === 'like' ? likedPart(user, other, body) : null;
     pick.decision = decision;
     noteDecision(store, user, other, { liked: decision === 'like', shownAt: wk.createdAt });
+    // Looks only say something when the photos were there to see before deciding.
+    if (!settingsOf(other).photosAfterMatch) looks.learn(user, other, decision === 'like');
     const convo = store.data.conversations[user.id];
     let match = null;
     if (decision === 'pass') {

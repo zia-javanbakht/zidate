@@ -32,6 +32,12 @@ On first start it creates 64 demo people (London, Berlin, New York and Toronto),
 - Without a key, or if a Claude call fails, a deterministic offline matchmaker does the same job with a keyword analyser. `PISHI_AGENT=offline` forces it.
 - Either way, the app (not the model) decides what to ask next, so coverage of every trait, the weekly rhythm and the privacy rules stay predictable.
 
+### Pishi Plus: looks
+
+With Pishi Plus, the matchmaker also learns which looks someone goes for. Claude vision describes each uploaded photo once, in a fixed list of style words (hair, glasses, beard, style of dress, tattoos, expression, setting; see `src/looks.js`). There are no words for ethnicity, skin colour, body shape or size, age or attractiveness, so none can be recorded. When a Plus member likes or passes on someone whose photos they could see, the words in those photos are counted in their matching signals, which are never shown in the app. After four such decisions they nudge the ranking a little (at most 0.06). Without `ANTHROPIC_API_KEY` photos are not described and looks play no part.
+
+There is no billing yet: a moderator sets the plan with `POST /api/admin/users/:id/plan` (`{"plan": "plus"}` or `"free"`), or `PISHI_PLUS_ALL=1` gives everyone Plus.
+
 ### Other settings
 
 | Variable | Default | Meaning |
@@ -44,6 +50,7 @@ On first start it creates 64 demo people (London, Berlin, New York and Toronto),
 | `PISHI_BASE_URL` | `http://localhost:PORT` | Used for links in emails |
 | `ADMIN_EMAILS` | | Comma-separated emails that can open the moderator page (You > Settings > Moderation) |
 | `PISHI_SEED` | `1` | `0` skips the demo people |
+| `PISHI_PLUS_ALL` | | `1` gives everyone Pishi Plus (looks from photos) |
 | `PISHI_LOG` | | `1` logs each request (ids masked) |
 | `NODE_ENV=production` | | Marks the session cookie `Secure` (use behind HTTPS) |
 
@@ -52,7 +59,7 @@ Backups of the data file are written daily next to it (last 7 kept).
 ## Tests
 
 ```sh
-npm test             # 83 unit and API tests
+npm test             # 124 unit and API tests
 npm run test:e2e     # 2 browser tests (need Playwright with Chromium installed)
 node scripts/screenshots.mjs out/   # screenshots of every screen, light and dark
 node scripts/turns-to-ready.mjs -v  # how many answers until matching unlocks
@@ -83,6 +90,7 @@ src/
     analyze.js     offline answer analysis
     mock.js        offline matchmaker
     claude.js      Claude matchmaker (structured outputs, falls back to offline)
+    vision.js      Claude vision: describes profile photos in style words (Plus)
   profile.js       hidden/shared profile rules, what is public
   matching.js      eligibility, fit, weekly picks
   traits.js, clock.js, db.js, auth.js, seed.js

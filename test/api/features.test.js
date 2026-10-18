@@ -423,3 +423,47 @@ test('plain reads do not rewrite the store', async () => {
   assert.ok(saves > 0, 'a read that creates the week still saves');
   srv.store.save = orig;
 });
+
+test('Pishi Plus: photos of people you decide on teach the matchmaker your type', async () => {
+  const seen = [];
+  const vision = { name: 'fake', describe: async ({ mime }) => { seen.push(mime); return { people: 1, tags: ['beard', 'glasses', 'not-a-word'] }; } };
+  const s = await startServer({ seed: false, vision });
+  const a = client(s.base);
+  const b = client(s.base);
+  const admin = client(s.base);
+  const B = (await onboard(b, { name: 'Ben', answers: { ...ANSWERS, b_gender: 'Man', b_seeking: 'Women' } })).me;
+  await b.post('/api/photos', { data: PNG });
+  await s.ctx.looks.idle();
+  assert.equal(seen.length, 1, 'described once, on upload');
+  const photoId = s.store.data.users[B.id].photos[0].id;
+  assert.deepEqual(s.store.data.photoLooks[photoId].tags, ['beard', 'glasses']);
+  // Never in what other people see, or in Ben's own profile view.
+  const A = (await onboard(a, { name: 'Ana', answers: { ...ANSWERS, b_gender: 'Woman', b_seeking: 'Men' } })).me;
+  assert.ok(!JSON.stringify((await a.get('/api/week')).data).includes('beard'));
+  assert.ok(!JSON.stringify((await b.get('/api/profile')).data).includes('beard'));
+  // Moderators set the plan until there is billing.
+  await onboard(admin, { name: 'Mod', email: 'admin@x.co' });
+  assert.equal((await a.post(`/api/admin/users/${A.id}/plan`, { plan: 'plus' })).status, 403);
+  assert.equal((await admin.post(`/api/admin/users/${A.id}/plan`, { plan: 'gold' })).status, 400);
+  assert.equal((await admin.post(`/api/admin/users/${A.id}/plan`, { plan: 'plus' })).status, 200);
+  assert.equal((await a.get('/api/me')).data.user.plus, true);
+  // Ben's photos are hidden until a match, so liking him says nothing about looks.
+  await a.post(`/api/week/${B.id}`, { decision: 'like' });
+  await s.ctx.looks.idle();
+  assert.equal(s.store.data.signals[A.id].looks.nLiked, 0);
+  // Ben's photos are shown before a match: now it counts.
+  await b.put('/api/settings', { photosAfterMatch: false });
+  const pick = s.store.data.weeks[Object.keys(s.store.data.weeks).find((k) => k.startsWith(`${A.id}:`))].picks.find((p) => p.id === B.id);
+  delete pick.decision;
+  await a.post(`/api/week/${B.id}`, { decision: 'like' });
+  await s.ctx.looks.idle();
+  assert.deepEqual(s.store.data.signals[A.id].looks.liked, { beard: 1, glasses: 1 });
+  assert.equal(seen.length, 1, 'the cached description is reused');
+  // Ben's export says how his photos were described; deleting the photo forgets it.
+  const exp = (await b.get('/api/me/export')).data;
+  assert.deepEqual(exp.photos[0].describedAs, ['beard', 'glasses']);
+  assert.equal((await a.get('/api/me/export')).data.matchingSignals.summary.looksFromPhotos.decisions, 1);
+  await b.del(`/api/photos/${photoId}`);
+  assert.equal(s.store.data.photoLooks[photoId], undefined);
+  await s.close();
+});

@@ -37,6 +37,16 @@ export default function admin({ store, route, HttpError, endSessions, mailer }) 
     return { body: { ok: true } };
   }, { admin: true });
 
+  // Pishi Plus, until there is billing.
+  route('POST', '/api/admin/users/:id/plan', async ({ params, body }) => {
+    const target = store.data.users[params.id];
+    if (!target) throw new HttpError(404, 'Not found.');
+    if (!['plus', 'free'].includes(body.plan)) throw new HttpError(400, 'Choose plus or free.');
+    if (body.plan === 'plus') target.plan = 'plus';
+    else delete target.plan;
+    return { body: { id: target.id, plan: body.plan } };
+  }, { admin: true });
+
   route('GET', '/api/admin/stats', async () => {
     const users = Object.values(store.data.users).filter((u) => !u.demo);
     const weekAgo = new Date(Date.parse(now().toISOString()) - 7 * 864e5).toISOString();
@@ -46,6 +56,7 @@ export default function admin({ store, route, HttpError, endSessions, mailer }) 
         people: users.length,
         ready: users.filter(isReady).length,
         paused: users.filter((u) => u.settings?.paused).length,
+        plus: users.filter((u) => u.plan === 'plus').length,
         suspended: users.filter((u) => u.suspended).length,
         demo: Object.values(store.data.users).length - users.length,
         picksThisWeek: users.filter((u) => store.data.weeks[`${u.id}:${currentWeek(u)}`]).length,
