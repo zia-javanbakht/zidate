@@ -70,11 +70,14 @@ export async function profile(section = '') {
     const edit = act(async () => {
       const v = await ask({ title: 'Edit this line', text: it.prompt || 'About me', fields: [{ name: 'text', label: 'Text', type: 'textarea', value: it.text, maxlength: 300 }] });
       if (!v) return;
-      await api('PATCH', `/api/profile/items/${it.id}`, { text: v.text });
+      const { feedback } = await api('PATCH', `/api/profile/items/${it.id}`, { text: v.text });
+      if (feedback) toast(`${feedback.label}. ${feedback.tip}`);
       reload();
     });
+    const fb = data.feedback?.[it.id];
     return h('div', { class: 'item' },
       h('div', { class: 'prompt' }, it.prompt || 'About me'), h('p', { class: 'text' }, it.text),
+      fb && fb.level !== 'great' ? h('p', { class: 'nudge small' }, h('strong', {}, `${fb.label}. `), fb.tip) : null,
       h('div', { class: 'row' }, state_,
         it.status !== 'approved' ? h('button', { class: 'btn small', onclick: setStatus('approved') }, 'Show on profile') : h('button', { class: 'btn small ghost', onclick: setStatus('hidden') }, 'Hide'),
         h('button', { class: 'btn small ghost', onclick: edit }, 'Edit'),
@@ -110,8 +113,8 @@ export async function profile(section = '') {
       validate: (x) => (x.text.trim() ? '' : 'Write a few words first.'),
     });
     if (!v) return;
-    await api('POST', '/api/profile/items', v);
-    toast('Added to your profile.');
+    const { feedback } = await api('POST', '/api/profile/items', v);
+    toast(feedback.level === 'great' ? 'Added. Great answer: specific and easy to reply to.' : `Added. ${feedback.label}: ${feedback.tip}`);
     reload();
   });
 

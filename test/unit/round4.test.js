@@ -55,3 +55,16 @@ test('recordMet ignores unknown answers and pairs who are not matched', () => {
   assert.equal(recordMet(store, a, b, 'maybe'), null);
   assert.ok(recordMet(store, a, b, 'talking').askAgainAt);
 });
+
+import { lineFeedback } from '../../src/feedback.js';
+
+test('line feedback: short, clichéd and negative lines get a tip; specific ones are praised', () => {
+  assert.equal(lineFeedback('My ideal Sunday', 'Brunch.').level, 'deeper');
+  const c = lineFeedback('What makes me laugh', 'I love to laugh and I am pretty easy going really.');
+  assert.equal(c.level, 'tweak');
+  assert.match(c.tip, /^Loving to laugh is on a lot of profiles/);
+  assert.equal(lineFeedback('The way to win me over', 'No drama please, and if you can’t hold a conversation do not bother.').level, 'tweak');
+  assert.equal(lineFeedback('A trip I still think about', 'Getting lost in Lisbon for 3 days and finding the best custard tart of my life.').level, 'great');
+  assert.equal(lineFeedback('A trip I still think about', 'I love to travel, last year I finally went to Japan with my sister.').level, 'great', 'a cliché with a real detail is fine');
+  assert.equal(lineFeedback('My ideal Sunday', 'Sleeping in and then going for a nice walk.').level, 'deeper');
+});

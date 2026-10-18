@@ -7,6 +7,7 @@ import { decodeUpload, mimeFor, MAX_PHOTOS } from '../photos.js';
 import { matchId, currentWeek } from '../matching.js';
 import { profileGuide } from '../guide.js';
 import { isAbusive } from '../moderation.js';
+import { lineFeedback } from '../feedback.js';
 
 const NO_CONTACT = 'Keep contact details off your profile. You can share them once you match.';
 export const PROMPTS = [
@@ -36,6 +37,8 @@ export default function profile({ store, route, HttpError, meView, photos, seria
       preview: publicProfile(user, { showPhotos: true }),
       hidden: describeHidden(user),
       guide: profileGuide(user),
+      // Tips on the lines the person wrote themselves (the matchmaker's are already shaped).
+      feedback: Object.fromEntries(user.shared.items.filter((i) => i.own).map((i) => [i.id, lineFeedback(i.prompt, i.text)])),
       prompts: PROMPTS,
       openers: OPENERS,
       interests: INTERESTS,
@@ -61,7 +64,14 @@ export default function profile({ store, route, HttpError, meView, photos, seria
     if (user.shared.items.length >= 30) throw new HttpError(400, 'That is plenty. Remove one first.');
     const item = { id: `it_${Math.random().toString(36).slice(2, 10)}`, prompt, text, status: 'approved', own: true };
     user.shared.items.push(item);
-    return { status: 201, body: { item } };
+    return { status: 201, body: { item, feedback: lineFeedback(prompt, text) } };
+  });
+
+  // Check a line before saving it.
+  route('POST', '/api/profile/items/feedback', async ({ body }) => {
+    const text = cleanText(body.text, 300);
+    if (!text) throw new HttpError(400, 'Write something first.');
+    return { body: { feedback: lineFeedback(cleanText(body.prompt, 80), text) } };
   });
 
   route('PATCH', '/api/profile/items/:id', async ({ user, params, body }) => {
@@ -76,8 +86,9 @@ export default function profile({ store, route, HttpError, meView, photos, seria
       if (!text) throw new HttpError(400, 'It cannot be empty.');
       if (hasContactInfo(text)) throw new HttpError(400, NO_CONTACT);
       item.text = text;
+      item.own = true; // edited in their own words
     }
-    return { body: { item } };
+    return { body: { item, ...(typeof body.text === 'string' ? { feedback: lineFeedback(item.prompt, item.text) } : {}) } };
   });
 
   route('DELETE', '/api/profile/items/:id', async ({ user, params }) => {
