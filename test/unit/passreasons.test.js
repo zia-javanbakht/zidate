@@ -36,10 +36,11 @@ test('"our lives seem different" asks which part, and steers preferences away fr
   const store = new Store(null);
   const u = makePerson(store);
   const convo = store.data.conversations[u.id];
-  await startPass(u, convo, { aspects: [{ trait: 'social', value: 0.9 }, { trait: 'tidiness', value: 0.2 }] });
+  await startPass(u, convo, { aspects: [{ trait: 'social', value: 0.9, gap: 0.4 }, { trait: 'tidiness', value: 0.2, gap: 0.3 }, { trait: 'family', value: 0.5, gap: 0 }] });
   const which = await respond(u, convo, 'Our lives seem different', mockEngine);
   assert.match(which.text, /Which part of Sam's life/);
-  assert.deepEqual(which.choices, ['Social life', 'Home life', 'A bit of everything']);
+  // Always the same list, whatever Sam's hidden profile says.
+  assert.deepEqual(which.choices, ['Social life', 'Family plans', 'Where work fits', 'Routine versus new things', 'Faith', 'How active they are', 'A bit of everything']);
   // Neutral labels only: nothing from Sam's hidden profile shows.
   assert.ok(!/0\.9|energised|recharges/.test(JSON.stringify(which)));
   await respond(u, convo, 'Social life', mockEngine);

@@ -1,5 +1,5 @@
 // The weekly two: see them, decide, widen the search, report.
-import { weeklyPicks, compatibility, currentWeek } from '../matching.js';
+import { weeklyPicks, compatibility, currentWeek, available } from '../matching.js';
 import { queueEvent, askNow } from '../agent/index.js';
 import { TRAIT_KEYS } from '../traits.js';
 import { normalizeCity } from '../cities.js';
@@ -34,9 +34,9 @@ export default function week(ctx) {
     const wk = store.data.weeks[`${user.id}:${currentWeek(user)}`];
     const pick = wk?.picks.find((p) => p.id === params.id);
     if (!pick) throw new HttpError(404, 'That person is not in your suggestions this week.');
-    if (pick.decision) throw new HttpError(409, 'You already decided.');
     const other = store.data.users[params.id];
-    if (!other) throw new HttpError(404, 'That person has left.');
+    if (!available(store, user, other)) throw new HttpError(404, 'That person is no longer available.');
+    if (pick.decision) throw new HttpError(409, 'You already decided.');
     pick.decision = decision;
     noteDecision(store, user, other, { liked: decision === 'like', shownAt: wk.createdAt });
     const convo = store.data.conversations[user.id];
@@ -73,20 +73,18 @@ export default function week(ctx) {
 // What the "why did you pass" questions may offer. Built here, where both people are known;
 // only neutral labels ever reach the person, never the other person's hidden values.
 function passEvent(user, other) {
-  const differ = TRAIT_KEYS
+  // Everything both are known on, not only where they differ: which questions get offered
+  // must not depend on the other person's hidden values.
+  const known = TRAIT_KEYS
     .filter((k) => user.hidden.traits[k].confidence >= 0.2 && other.hidden.traits[k].confidence >= 0.2)
-    .map((k) => ({ trait: k, value: other.hidden.traits[k].value, gap: Math.abs(user.hidden.traits[k].value - other.hidden.traits[k].value) }))
-    .filter((a) => a.gap >= 0.2)
-    .sort((a, b) => b.gap - a.gap)
-    .slice(0, 3)
-    .map(({ trait, value }) => ({ trait, value: Math.round(value * 100) / 100 }));
+    .map((k) => ({ trait: k, value: Math.round(other.hidden.traits[k].value * 100) / 100, gap: Math.round(Math.abs(user.hidden.traits[k].value - other.hidden.traits[k].value) * 100) / 100 }));
   const [mine, theirs] = [user.basics.age, other.basics.age];
   const approved = other.shared.items.filter((i) => i.status === 'approved').length + (other.shared.bio ? 1 : 0);
   return {
     type: 'pass',
     candidateId: other.id,
     name: other.name,
-    aspects: differ,
+    aspects: known.length >= 3 ? known : [],
     away: normalizeCity(user.basics.city) !== normalizeCity(other.basics.city),
     age: theirs,
     older: mine && theirs && mine !== theirs ? theirs > mine : null,

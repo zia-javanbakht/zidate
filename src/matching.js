@@ -165,6 +165,12 @@ function closed(store, a, b) {
   return Boolean(d.passes[`${b.id}>${a.id}`] || d.blocks[`${a.id}>${b.id}`] || d.blocks[`${b.id}>${a.id}`]);
 }
 
+// Can this person still be shown to, liked by or matched with `user`?
+export function available(store, user, other) {
+  if (!other || inactive(other)) return false;
+  return !(store.data.blocks[`${user.id}>${other.id}`] || store.data.blocks[`${other.id}>${user.id}`]);
+}
+
 // Each person picks the day their two arrive, at midnight in their own time zone.
 function schedule(user) {
   const s = settingsOf(user);
@@ -222,8 +228,9 @@ export function weeklyPicks(store, user) {
     week: wk,
     ready: true,
     next: nextAt,
+    // Someone who has since paused, been suspended or blocked drops out of this week too.
     picks: week.picks
-      .filter((p) => store.data.users[p.id])
+      .filter((p) => available(store, user, store.data.users[p.id]))
       .map((p) => {
         const other = store.data.users[p.id];
         const matched = Boolean(store.data.matches[matchId(user.id, other.id)]);

@@ -253,7 +253,19 @@ test('report someone straight from a suggestion', async () => {
   await onboard(c);
   const p = (await c.get('/api/week')).data.picks[0];
   assert.equal((await c.post(`/api/week/${p.id}/report`, { reason: 'Fake' })).status, 200);
-  assert.equal((await c.get('/api/week')).data.picks.find((x) => x.id === p.id).decision, 'pass');
+  // Gone from the week straight away, and they cannot be liked any more.
+  assert.equal((await c.get('/api/week')).data.picks.find((x) => x.id === p.id), undefined);
+  assert.equal((await c.post(`/api/week/${p.id}`, { decision: 'like' })).status, 404);
+});
+
+test('someone suspended mid-week drops out of the picks', async () => {
+  const c = client(srv.base);
+  await onboard(c);
+  const p = (await c.get('/api/week')).data.picks[0];
+  srv.store.data.users[p.id].suspended = true;
+  assert.equal((await c.get('/api/week')).data.picks.find((x) => x.id === p.id), undefined);
+  assert.equal((await c.post(`/api/week/${p.id}`, { decision: 'like' })).status, 404);
+  delete srv.store.data.users[p.id].suspended;
 });
 
 test('an empty week offers to widen the age range', async () => {

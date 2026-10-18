@@ -252,6 +252,11 @@ const ASPECT_LABEL = {
   independence: 'Time together versus apart', humour: 'Sense of humour',
 };
 
+// The parts of life offered after "our lives seem different". Always the same list in the
+// same order: choosing which parts to show from the other person's hidden profile would
+// tell the person where that profile differs from theirs.
+const LIFE_PARTS = ['social', 'family', 'ambition', 'adventure', 'spirituality', 'activity'];
+
 // Why did they pass? A short chain: the main reason, then one follow-up that turns it
 // into something matching can use. event: { candidateId, name, aspects, away, age, older, thin }
 function passQuestion(event) {
@@ -284,13 +289,15 @@ function passFollowUp(event) {
   if (event.type === 'pass-lifestyle') {
     // Point preferences away from where this person sat on each part of life.
     const away = (a, confidence) => ({ trait: a.trait, value: 1 - a.value, confidence });
-    const top = event.aspects.slice(0, 3);
+    const known = Object.fromEntries((event.aspects || []).map((a) => [a.trait, a]));
+    // Only where they really differ: "everything" should not move traits they share.
+    const differ = (event.aspects || []).filter((a) => a.gap == null || a.gap >= 0.2);
     return {
       id: `fbl_${cid}`, mode: 'partner',
       text: `Which part of ${name}'s life felt furthest from yours?`,
       choices: [
-        ...top.map((a) => ({ label: ASPECT_LABEL[a.trait], ack: 'Got it. I will look for someone closer to you there.', prefer: [away(a, 0.35)], detail: a.trait })),
-        { label: 'A bit of everything', ack: 'Got it, I will adjust across the board.', prefer: top.map((a) => away(a, 0.2)), detail: 'everything' },
+        ...LIFE_PARTS.map((k) => ({ label: ASPECT_LABEL[k], ack: 'Got it. I will look for someone closer to you there.', prefer: known[k] ? [away(known[k], 0.35)] : [], detail: k })),
+        { label: 'A bit of everything', ack: 'Got it, I will adjust across the board.', prefer: differ.map((a) => away(a, 0.2)), detail: 'everything' },
       ],
     };
   }
