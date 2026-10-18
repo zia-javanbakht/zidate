@@ -29,6 +29,10 @@ function parseBasic(key, text) {
     return null;
   }
   if (key === 'seeking') {
+    const nb = /non[- ]?binary|enby|\bnb\b/.test(t);
+    if (nb && /\b(women|woman|girls|ladies)\b/.test(t)) return 'women-nb';
+    if (nb && /\b(men|man|guys)\b/.test(t)) return 'men-nb';
+    if (nb) return 'nonbinary';
     if (/^(women|woman|female|girls|ladies)$/.test(t)) return 'women';
     if (/^(men|man|male|guys)$/.test(t)) return 'men';
     if (/everyone|both|any|all|anyone|doesn'?t matter/.test(t)) return 'everyone';

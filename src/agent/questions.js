@@ -12,7 +12,7 @@ export const BASICS = [
     id: 'b_gender', key: 'gender', text: 'First, a few basics so I only suggest people who fit. How do you describe yourself?',
     choices: ['Woman', 'Man', 'Non-binary'],
   },
-  { id: 'b_seeking', key: 'seeking', text: 'And who would you like to meet?', choices: ['Women', 'Men', 'Everyone'] },
+  { id: 'b_seeking', key: 'seeking', text: 'And who would you like to meet?', choices: ['Women', 'Men', 'Non-binary people', 'Everyone'] },
   { id: 'b_age', key: 'age', text: 'How old are you?' },
   { id: 'b_city', key: 'city', text: 'Which city are you in?' },
 ];

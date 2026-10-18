@@ -10,13 +10,16 @@ import { revealedPreferences, likeChance, responsiveness, popularity, hoursOverl
 
 export const PER_WEEK = 2;
 
+// Who each choice of "I want to meet" includes. Non-binary people can be included on
+// their own or together with women or men, not only under "everyone".
+export const SEEKING = {
+  women: ['woman'], men: ['man'], nonbinary: ['nonbinary'],
+  'women-nb': ['woman', 'nonbinary'], 'men-nb': ['man', 'nonbinary'],
+  everyone: ['woman', 'man', 'nonbinary'],
+};
+
 function wants(seeker, other) {
-  const s = seeker.basics.seeking;
-  const g = other.basics.gender;
-  if (s === 'everyone') return true;
-  if (s === 'women') return g === 'woman';
-  if (s === 'men') return g === 'man';
-  return false;
+  return Boolean(SEEKING[seeker.basics.seeking]?.includes(other.basics.gender));
 }
 
 export const DEFAULT_AGE_RANGE = 8;

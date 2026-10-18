@@ -4,7 +4,7 @@ import { hashPassword, verifyPassword } from '../auth.js';
 import { cleanText, settingsOf, describeHidden } from '../profile.js';
 import { normalizeCity } from '../cities.js';
 import { now, validTimeZone } from '../clock.js';
-import { currentWeek } from '../matching.js';
+import { currentWeek, SEEKING } from '../matching.js';
 import { signalsOf, summarizeSignals, forget } from '../signals.js';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -180,7 +180,7 @@ export default function account(ctx) {
       user.basics.gender = b.gender;
     }
     if (b.seeking !== undefined) {
-      if (!['women', 'men', 'everyone'].includes(b.seeking)) throw new HttpError(400, 'Pick women, men or everyone.');
+      if (!SEEKING[b.seeking]) throw new HttpError(400, 'Pick who you want to meet.');
       user.basics.seeking = b.seeking;
     }
     if (b.age !== undefined) {

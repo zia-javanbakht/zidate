@@ -92,3 +92,26 @@ test('why we picked them: facts both chose to show, never hidden ones', () => {
   b.shared.facts.languages = { value: 'farsi and French', status: 'approved' };
   assert.equal(reason(a, b), 'You both like films. You both speak Farsi.');
 });
+
+import { eligible } from '../../src/matching.js';
+import { respond, opening } from '../../src/agent/index.js';
+
+test('identities: non-binary people can be sought on their own or with women or men', async () => {
+  const store = new Store(null);
+  const nb = person(store, { gender: 'nonbinary', seeking: 'women-nb' });
+  const w = person(store, { gender: 'woman', seeking: 'men-nb' });
+  const m = person(store, { gender: 'man', seeking: 'women' });
+  const w2 = person(store, { gender: 'woman', seeking: 'nonbinary' });
+  assert.equal(eligible(nb, w), true);
+  assert.equal(eligible(nb, w2), true);
+  assert.equal(eligible(w, m), true);
+  assert.equal(eligible(nb, m), false, 'he wants women only');
+  assert.equal(eligible(w2, m), false);
+  // Typed answers in the conversation.
+  const u = newUser(store, { name: 'T', email: 't@x.co', password: null });
+  const convo = store.data.conversations[u.id];
+  opening(u, convo);
+  await respond(u, convo, 'Non-binary');
+  await respond(u, convo, 'Women and non-binary people');
+  assert.equal(u.basics.seeking, 'women-nb');
+});

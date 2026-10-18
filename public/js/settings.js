@@ -25,7 +25,7 @@ export async function settings() {
     name: field({ id: 's-name', label: 'First name', value: me.name, maxlength: 40, autocomplete: 'given-name' }),
     age: field({ id: 's-age', label: 'Age', type: 'number', value: b.age ?? '', min: 18, max: 99, inputmode: 'numeric' }),
     gender: field({ id: 's-gender', label: 'I am', type: 'select', value: b.gender || 'woman', options: [['woman', 'a woman'], ['man', 'a man'], ['nonbinary', 'non-binary']] }),
-    seeking: field({ id: 's-seeking', label: 'I want to meet', type: 'select', value: b.seeking || 'everyone', options: [['women', 'women'], ['men', 'men'], ['everyone', 'everyone']] }),
+    seeking: field({ id: 's-seeking', label: 'I want to meet', type: 'select', value: b.seeking || 'everyone', options: [['women', 'women'], ['men', 'men'], ['nonbinary', 'non-binary people'], ['women-nb', 'women and non-binary people'], ['men-nb', 'men and non-binary people'], ['everyone', 'everyone']] }),
     ageRange: field({ id: 's-range', label: 'Age range', type: 'select', value: String(b.ageRange ?? 8), options: [3, 5, 8, 10, 15, 20].map((n) => [String(n), `within ${n} years`]) }),
     city: field({ id: 's-city', label: 'City', value: b.city || '', maxlength: 50, autocomplete: 'address-level2' }),
     distance: field({ id: 's-distance', label: 'How far would you go?', type: 'select', value: b.distance || '', options: [
