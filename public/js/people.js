@@ -285,6 +285,9 @@ export async function thread(id) {
   const form = h('form', { class: 'composer' }, input, h('button', { class: 'btn', type: 'submit' }, 'Send'));
   const ice = h('div', { class: 'chips', 'aria-label': 'Ways to start' },
     (data.icebreakers || []).map((t) => h('button', { class: 'chip', type: 'button', onclick: () => { input.value = t; input.focus(); } }, t)));
+  const ideas = data.dateIdeas?.length ? h('details', { class: 'ideas' },
+    h('summary', {}, 'Ideas for a first date'),
+    h('ul', {}, data.dateIdeas.map((i) => h('li', {}, h('button', { class: 'link', type: 'button', onclick: () => { input.value = i.message; input.focus(); } }, i.text))))) : null;
   form.onsubmit = async (e) => {
     e.preventDefault();
     const text = input.value.trim();
@@ -442,6 +445,6 @@ export async function thread(id) {
   render(h('section', { class: 'chat' },
     h('div', { class: 'section-head' }, h('a', { class: 'back', href: '#/matches' }, '← Matches'), h('div', { class: 'row wrap' }, metBtn, shareBtn, closeBtn, unmatch)),
     plan,
-    personCard(data.person), log, data.closed ? null : ice, data.closed ? null : form));
+    personCard(data.person), log, data.closed ? null : ice, data.closed ? null : ideas, data.closed ? null : form));
   window.scrollTo(0, document.body.scrollHeight);
 }

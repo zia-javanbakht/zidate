@@ -127,3 +127,26 @@ export function passEvent(user, other) {
     thin: approved < 2,
   };
 }
+
+// First-date ideas for a match, from interests both chose to show. Low-key, public places
+// first: a short first meeting is easier, and safer, than a whole evening.
+const IDEAS = {
+  hiking: 'a short walk somewhere green, with a coffee at the end', running: 'a slow Sunday run and breakfast after',
+  cooking: 'a food market, picking one thing each to try', baking: 'a bakery crawl, rating the best pastry',
+  reading: 'an hour in a good bookshop, then swapping a recommendation', music: 'a small gig or an open-mic night',
+  concerts: 'a small gig on a weeknight', films: 'an old film at an independent cinema, then a drink to argue about it',
+  art: 'a gallery for an hour, then a coffee', museums: 'a museum on a late-opening evening', photography: 'a walk with your cameras, swapping your best shot',
+  coffee: 'coffee somewhere with good pastries', wine: 'a glass of wine at a quiet bar', 'board games': 'a board-game café',
+  theatre: 'a matinee, then an early dinner', dancing: 'a beginners’ dance class', climbing: 'a bouldering session for beginners',
+  cycling: 'a bike ride to somewhere with a view', yoga: 'a weekend yoga class, then brunch', gaming: 'an arcade bar',
+  tennis: 'a friendly game of tennis', swimming: 'a lido and a hot chocolate after', gardening: 'a botanic garden',
+  history: 'a walking tour of an old part of town', science: 'a science museum late', poetry: 'a poetry or storytelling night',
+  dogs: 'a walk in a park with plenty of dogs', podcasts: 'a long walk, trading favourite episodes', languages: 'a language-exchange evening',
+};
+
+export function dateIdeas(me, other) {
+  const common = me.shared.interests.filter((i) => other.shared.interests.includes(i) && IDEAS[i]);
+  const ideas = common.slice(0, 3).map((i) => ({ interest: i, text: `You both like ${i}: ${IDEAS[i]}.`, message: `How about ${IDEAS[i]}?` }));
+  if (ideas.length < 2) ideas.push({ interest: null, text: 'A coffee or a short walk: easy to arrange, easy to end.', message: 'Would you like to get a coffee or go for a short walk this week?' });
+  return ideas;
+}

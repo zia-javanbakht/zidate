@@ -340,3 +340,7 @@ blockquote.about img { width: 120px; aspect-ratio: 4 / 5; object-fit: cover; bor
 .turn { color: var(--accent); font-weight: 600; white-space: nowrap; }
 .closed-note { margin: 4px 0 8px; }
 .banner.plan { flex-wrap: wrap; }
+.ideas { margin: 6px 0; font-size: .9rem; }
+.ideas summary { cursor: pointer; color: var(--accent); }
+.ideas ul { margin: 6px 0 0; padding-left: 18px; }
+.ideas .link { text-align: left; }

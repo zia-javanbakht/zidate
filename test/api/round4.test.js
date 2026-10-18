@@ -287,3 +287,20 @@ test('share date review: "home safe" survives an unmatch, and a long-past date n
   clock.reset();
   await s.close();
 });
+
+test('first-date ideas appear once both have talked a little, built from shared interests', async () => {
+  const { s, a, b, mid } = await matched();
+  for (const c of [a, b]) {
+    await c.post('/api/profile/interests', { name: 'films' });
+    await c.post('/api/profile/interests', { name: 'climbing' });
+  }
+  assert.deepEqual((await a.get(`/api/matches/${mid}`)).data.dateIdeas, []);
+  for (let i = 0; i < 2; i++) {
+    await a.post(`/api/matches/${mid}`, { text: `Message ${i} from Ana` });
+    await b.post(`/api/matches/${mid}`, { text: `Message ${i} from Ben` });
+  }
+  const ideas = (await a.get(`/api/matches/${mid}`)).data.dateIdeas;
+  assert.deepEqual(ideas.map((i) => i.interest), ['films', 'climbing']);
+  assert.match(ideas[0].message, /^How about an old film/);
+  await s.close();
+});

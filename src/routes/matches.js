@@ -1,6 +1,6 @@
 // Matches and messages between people, delivered live.
 import { publicProfile, cleanText } from '../profile.js';
-import { demoReply, icebreakers, passEvent } from '../social.js';
+import { demoReply, icebreakers, passEvent, dateIdeas } from '../social.js';
 import { recordMet, MET } from '../dates.js';
 import { CLOSE_LINES } from '../turns.js';
 import { activePlan, planView } from '../safety.js';
@@ -69,6 +69,8 @@ export default function matches(ctx) {
         seenByThem: other ? m.seen?.[other.id] || null : null,
         icebreakers: msgs.length || !other ? [] : icebreakers(user, other),
         met: m.met?.[user.id]?.answer || null,
+        // Once you have talked a little, some first-date ideas from what you both like.
+        dateIdeas: other && !m.closed && msgs.filter((x) => x.from === user.id).length >= 2 && msgs.filter((x) => x.from === other.id).length >= 2 ? dateIdeas(user, other) : [],
         closed: m.closed ? { byMe: m.closed.by === user.id, at: m.closed.at } : null,
         closeLines: CLOSE_LINES,
         date: (() => { const d = activePlan(store, user.id, m.id); return d ? planView(d, settingsOf(user).timeZone) : null; })(),
