@@ -40,7 +40,7 @@ export function newUser(store, { name, email, password }) {
     emailVerified: false,
     password: password ? hashPassword(password) : null,
     createdAt: now().toISOString(),
-    basics: { gender: null, seeking: null, age: null, city: null },
+    basics: { gender: null, seeking: null, age: null, city: null, distance: null },
     hidden: emptyHidden(),
     shared: { bio: '', bioDraft: '', interests: [], items: [], facts: {} },
     photos: [],

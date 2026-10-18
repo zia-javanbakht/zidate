@@ -2,7 +2,7 @@
 import { weeklyPicks, compatibility, currentWeek, available, fillWeek, canWiden, PER_WEEK } from '../matching.js';
 import { queueEvent, askNow } from '../agent/index.js';
 import { TRAIT_KEYS } from '../traits.js';
-import { normalizeCity } from '../cities.js';
+import { nearby } from '../cities.js';
 import { learnFromLike, createMatch } from '../social.js';
 import { cleanText } from '../profile.js';
 import { now } from '../clock.js';
@@ -88,7 +88,7 @@ function passEvent(user, other) {
     candidateId: other.id,
     name: other.name,
     aspects: known.length >= 3 ? known : [],
-    away: normalizeCity(user.basics.city) !== normalizeCity(other.basics.city),
+    away: !nearby(user.basics.city, other.basics.city),
     age: theirs,
     older: mine && theirs && mine !== theirs ? theirs > mine : null,
     thin: approved < 2,

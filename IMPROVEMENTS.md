@@ -123,3 +123,9 @@ Asked for: guide people to complete both profiles; keep a much more detailed rec
 | # | Area | What changed | Verified by |
 |---|---|---|---|
 | 90 | Brand | The logo is now an 80s-style pixel cat, hand-drawn on a 32 x 32 grid: a sitting cat whose raised tail curls over its head into a question mark. Same rose palette plus a pale pink for whiskers and eye glints, a one-colour version (logo-mono.svg), and the favicon and app icons rendered at whole-pixel multiples so they stay crisp. The header and welcome page show it at 32 and 128 px for the same reason. | Rendered at 512, 192, 128, 64 and 32 px |
+
+## Distance (91)
+
+| # | Area | What changed | Verified by |
+|---|---|---|---|
+| 91 | Matching | Distance now counts, not just "same city or not". About 130 cities have coordinates, so the matchmaker knows Reading is next to London and Berlin is not. It asks early whether long distance is an option (only near me, up to a few hours away, distance is no problem), also changeable in Settings. Both people's answers must allow the distance between them, people nearby rank first unless the person is open to long distance, and the reason says how far away someone is ("About 930 km away, in Berlin."). "Too far away" on a pass now means your area rather than your exact city, and the private like/pass record uses the same nearby rule. Demo people have a mix of answers and some live in the next town over. | Unit, API and browser tests |

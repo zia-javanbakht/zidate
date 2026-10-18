@@ -19,6 +19,16 @@ export const BASICS = [
 
 export const QUESTIONS = [
   {
+    // Asked early: it decides who can be suggested at all. Settings can change it later.
+    id: 'q_distance', mode: 'self', traits: [], early: true, skipIf: (u) => u.basics.distance != null,
+    text: 'Would you date someone who lives in another city?',
+    choices: [
+      { label: 'Only someone near me', ack: 'Close to home it is. I will keep to your area.', set: {}, basics: { distance: 'near' } },
+      { label: 'Up to a few hours away', ack: 'A few hours away is fine. Noted.', set: {}, basics: { distance: 'hours' } },
+      { label: 'Distance is no problem', ack: 'Open to long distance. Noted, I will still favour people closer by.', set: {}, basics: { distance: 'any' } },
+    ],
+  },
+  {
     id: 'q_weekend', mode: 'self', share: 'My ideal Sunday',
     text: 'Describe a Sunday you would happily repeat every week.',
     traits: ['social', 'activity', 'adventure'],
@@ -272,7 +282,7 @@ function passQuestion(event) {
     choices.push({ label: event.older ? 'A bit too old for me' : 'A bit too young for me', ack: 'Understood.', reason: 'age', then: { type: 'pass-age', ...base, age: event.age, older: event.older } });
   }
   if (event.away) {
-    choices.push({ label: 'Too far away', ack: 'Understood. From now on I will stick to people in your city.', reason: 'distance', limits: { localOnly: true } });
+    choices.push({ label: 'Too far away', ack: 'Understood. From now on I will stick to people near you.', reason: 'distance', limits: { localOnly: true } });
   }
   if (event.thin) {
     choices.push({ label: 'Their profile said too little', ack: 'Noted. I will favour people who share a little more about themselves.', reason: 'profile', limits: { prefersDetail: true } });

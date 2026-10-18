@@ -2,7 +2,7 @@
 import { TRAIT_KEYS, CORE_TRAITS, TOPICS } from './traits.js';
 import { basicsDone } from './profile.js';
 import { isReady, publicProfile, settingsOf } from './profile.js';
-import { normalizeCity } from './cities.js';
+import { distanceKm, NEARBY_KM, FEW_HOURS_KM } from './cities.js';
 import { weekKey, nextWeekStart, now } from './clock.js';
 import { revealedPreferences, likeChance, responsiveness, popularity, hoursOverlap, noteShown, reportCounts } from './signals.js';
 
@@ -31,8 +31,32 @@ function ageOk(a, b) {
   return Math.min(x, y) >= Math.max(x, y) / 2 + 7;
 }
 
-function sameCity(a, b) {
-  return normalizeCity(a.basics.city) === normalizeCity(b.basics.city);
+// How far someone is willing to go for a relationship, in km. Infinity when distance is no
+// object (or they have not said). "Too far away" on a pass narrows it to their own area.
+export function maxDistance(u) {
+  if (u.hidden.limits?.localOnly) return NEARBY_KM;
+  return { near: NEARBY_KM, hours: FEW_HOURS_KM }[u.basics.distance] ?? Infinity;
+}
+
+export function distanceBetween(a, b) {
+  return distanceKm(a.basics.city, b.basics.city);
+}
+
+// Both people must be happy with the distance. When one of them wants someone close and we
+// do not know where the other city is, only the same city counts as close.
+function distanceOk(a, b) {
+  const limit = Math.min(maxDistance(a), maxDistance(b));
+  if (limit === Infinity) return true;
+  const d = distanceBetween(a, b);
+  return d != null && d <= limit;
+}
+
+// Same area first, then a few hours away, then further. Unknown distances count as far.
+function distanceTier(a, b) {
+  const d = distanceBetween(a, b);
+  if (d != null && d <= NEARBY_KM) return 0;
+  if (d != null && d <= FEW_HOURS_KM) return 1;
+  return 2;
 }
 
 // Out of the pool: paused, suspended, or stopped (e.g. under 18).
@@ -55,6 +79,7 @@ export function eligible(a, b) {
   if (a.id === b.id || inactive(a) || inactive(b)) return false;
   if (!wants(a, b) || !wants(b, a)) return false;
   if (!ageOk(a, b)) return false;
+  if (!distanceOk(a, b)) return false;
   if (kidsConflict(a, b)) return false;
   if (dealbreaker(a, b) || dealbreaker(b, a)) return false;
   return true;
@@ -84,7 +109,12 @@ export function fit(a, b) {
   // ones are ever named to the other person (see reason()).
   const said = (u) => [...u.shared.interests, ...(u.shared.suggestedInterests || [])];
   score = score * 0.8 + overlap(a.hidden.values, b.hidden.values) * 0.1 + overlap(said(a), said(b)) * 0.1;
-  if (sameCity(a, b)) score += 0.05;
+  // Closer is easier: a small bonus for the same area, less for a few hours away. Someone
+  // open to long distance does not mind the rest; anyone else is nudged towards closer people.
+  const tier = distanceTier(a, b);
+  if (tier === 0) score += 0.05;
+  else if (tier === 1) score += 0.02;
+  else if (a.basics.distance !== 'any') score -= 0.02;
   // Small nudges from the categorical parts of the hidden profile.
   const [la, lb] = [a.hidden.aspects?.loveLanguage, b.hidden.aspects?.loveLanguage];
   if (la && la === lb) score += 0.03;
@@ -142,8 +172,17 @@ export function signalBoost(store, a, b, reports = reportCounts(store)) {
 
 // A reason shown to the person. Built only from shared information, never hidden traits.
 export function reason(a, b) {
-  const away = sameCity(a, b) ? '' : ` A little further away, in ${b.basics.city}.`;
+  // Cities are on both profiles, so the distance between them is fair to mention.
+  const d = distanceBetween(a, b);
+  const away = d === 0 ? ''
+    : d == null ? ` A little further away, in ${b.basics.city}.`
+    : d <= NEARBY_KM ? ` Close by, in ${b.basics.city}.`
+    : ` About ${roundKm(d)} km away, in ${b.basics.city}.`;
   return sharedReason(a, b) + away;
+}
+
+function roundKm(d) {
+  return d < 100 ? Math.round(d / 5) * 5 : d < 1000 ? Math.round(d / 10) * 10 : Math.round(d / 100) * 100;
 }
 
 function sharedReason(a, b) {
@@ -208,12 +247,15 @@ function rank(store, user) {
   const reports = reportCounts(store);
   return Object.values(store.data.users)
     .filter((o) => !seen.has(o.id) && isReady(o) && eligible(user, o) && !closed(store, user, o))
-    // Either person may have asked to only meet people in their own city.
-    .filter((o) => sameCity(user, o) || !(user.hidden.limits?.localOnly || o.hidden.limits?.localOnly))
     // Someone who already liked this person is a likely mutual match: give them a lift.
-    .map((o) => ({ o, s: compatibility(user, o) + signalBoost(store, user, o, reports) + (store.data.likes[`${o.id}>${user.id}`] ? 0.15 : 0), local: sameCity(user, o) }))
-    // People nearby come first; only widen the search when the city runs out.
-    .sort((p, q) => q.local - p.local || q.s - p.s || p.o.id.localeCompare(q.o.id));
+    .map((o) => ({ o, s: compatibility(user, o) + signalBoost(store, user, o, reports) + (store.data.likes[`${o.id}>${user.id}`] ? 0.15 : 0), tier: openToDistance(user) ? 0 : distanceTier(user, o) }))
+    // People nearby come first and the search only reaches further when the area runs out,
+    // unless this person told us distance does not matter to them.
+    .sort((p, q) => p.tier - q.tier || q.s - p.s || p.o.id.localeCompare(q.o.id));
+}
+
+function openToDistance(u) {
+  return u.basics.distance === 'any' && !u.hidden.limits?.localOnly;
 }
 
 // Top up a week to PER_WEEK people, keeping whoever is already in it.

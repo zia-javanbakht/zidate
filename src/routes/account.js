@@ -183,6 +183,10 @@ export default function account(ctx) {
       if (![3, 5, 8, 10, 15, 20].includes(r)) throw new HttpError(400, 'Pick one of the age ranges.');
       user.basics.ageRange = r;
     }
+    if (b.distance !== undefined) {
+      if (!['near', 'hours', 'any'].includes(b.distance)) throw new HttpError(400, 'Pick how far you would go.');
+      user.basics.distance = b.distance;
+    }
     if (b.city !== undefined) {
       const city = normalizeCity(cleanText(b.city, 50));
       if (!city) throw new HttpError(400, 'Your city cannot be empty.');

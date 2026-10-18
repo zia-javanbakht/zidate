@@ -8,7 +8,7 @@
 // leak it by accident. Nothing here may record health, ethnicity, sexuality beyond what
 // the person chose in the basics, finances, or judgements of looks.
 import { TRAIT_KEYS } from './traits.js';
-import { normalizeCity } from './cities.js';
+import { nearby } from './cities.js';
 import { cleanText } from './profile.js';
 import { now } from './clock.js';
 
@@ -100,7 +100,7 @@ export function noteDecision(store, user, other, { liked, shownAt }) {
   }
   bump((other.photos || []).length ? d.photos.with : d.photos.without, liked);
   bump(richness(other) >= 3 ? d.detail.rich : d.detail.sparse, liked);
-  bump(normalizeCity(user.basics.city) === normalizeCity(other.basics.city) ? d.distance.local : d.distance.away, liked);
+  bump(nearby(user.basics.city, other.basics.city) ? d.distance.local : d.distance.away, liked);
   const gap = Math.abs((user.basics.age || 0) - (other.basics.age || 0));
   bump(gap <= 3 ? d.ageGap.closer : d.ageGap.wider, liked);
   for (const k of TRAIT_KEYS) {
@@ -210,7 +210,7 @@ export function likeChance(sig, a, b) {
   const parts = [
     rate((b.photos || []).length ? d.photos.with : d.photos.without),
     rate(richness(b) >= 3 ? d.detail.rich : d.detail.sparse),
-    rate(normalizeCity(a.basics.city) === normalizeCity(b.basics.city) ? d.distance.local : d.distance.away),
+    rate(nearby(a.basics.city, b.basics.city) ? d.distance.local : d.distance.away),
     rate(Math.abs((a.basics.age || 0) - (b.basics.age || 0)) <= 3 ? d.ageGap.closer : d.ageGap.wider),
   ].filter((x) => x != null);
   return parts.length ? parts.reduce((x, y) => x + y, 0) / parts.length : null;
