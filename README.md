@@ -92,8 +92,9 @@ IMPROVEMENTS.md    the 70 improvements and how each was checked
 - Under-18s are stopped at the age question.
 - Unmatch and report; reported or unmatched pairs are never suggested again.
 - Delete account removes both profiles, conversations, matches and messages.
+- Photo verification: a live selfie in a random pose (from a list of seven, valid for 10 minutes, one selfie per pose, five tries a day) is compared with the profile photos. With `ANTHROPIC_API_KEY` set, Claude checks that it is a live photo, shows the pose and is the same person; a clear match verifies at once, an unsure answer or a failed call goes to a moderator (Moderation page), and a mismatch can be sent to a moderator once. Without a key every selfie goes to a moderator. The Verified badge shows only while every profile photo has been checked; a photo added later is compared with the stored selfie the same way. The selfie is never on the profile, only moderators reviewing it can open it, and it is deleted with the verification or the account.
 - Passwords are hashed with scrypt, sessions are HttpOnly cookies, writes must be JSON (CSRF), and sign-in, chat and writes are rate limited.
 
 ## Not built yet
 
-Phone push notifications, photo moderation, and a real database for more than a few thousand people. The Claude matchmaker has not been run against the live API in development (no key was available); the offline matchmaker is fully tested.
+Phone push notifications, photo moderation (beyond verification), and a real database for more than a few thousand people. The Claude matchmaker and selfie check have not been run against the live API in development (no key was available); the offline matchmaker is fully tested.

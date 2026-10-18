@@ -1,9 +1,10 @@
 // "You": photos, the shared profile (with approvals), a preview, and the hidden profile.
 import { h, api, render, setMe, state, toast, progress, ask, cap, pretty } from './core.js';
 import { personCard } from './people.js';
+import { verifyBlock } from './verify.js';
 
 // Shrink a picked image in the browser so uploads stay small (and drop camera metadata).
-async function toDataUrl(file, max = 1280) {
+export async function toDataUrl(file, max = 1280) {
   const url = URL.createObjectURL(file);
   try {
     const img = new Image();
@@ -230,6 +231,7 @@ export async function profile(section = '') {
     guide.complete ? progress(me.completeness) : guideCard(guide),
     me.settings.paused ? h('div', { class: 'banner' }, h('span', {}, 'You are paused, so no one sees you.'), h('a', { href: '#/settings' }, 'Change')) : null,
     photoBlock,
+    verifyBlock(data.verification, photos.length, reload),
     sharedBlock,
     h('details', { class: 'card' },
       h('summary', {}, 'Preview as a match sees it'),

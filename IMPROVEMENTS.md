@@ -129,3 +129,9 @@ Asked for: guide people to complete both profiles; keep a much more detailed rec
 | # | Area | What changed | Verified by |
 |---|---|---|---|
 | 91 | Matching | Distance now counts, not just "same city or not". About 130 cities have coordinates, so the matchmaker knows Reading is next to London and Berlin is not. It asks early whether long distance is an option (only near me, up to a few hours away, distance is no problem), also changeable in Settings. Both people's answers must allow the distance between them, people nearby rank first unless the person is open to long distance, and the reason says how far away someone is ("About 930 km away, in Berlin."). "Too far away" on a pass now means your area rather than your exact city, and the private like/pass record uses the same nearby rule. Demo people have a mix of answers and some live in the next town over. | Unit, API and browser tests |
+
+## Photo verification (92)
+
+| # | Area | What changed | Verified by |
+|---|---|---|---|
+| 92 | Safety | Photo verification with a Verified badge. On the You page, people take a live selfie (camera in the browser, or the phone camera as a fallback) in a pose picked at random, such as "Cover one eye with your hand". With an API key, Claude compares it with their photos and checks it is a live photo in the right pose: a clear match verifies at once, a wrong pose or a photo of a screen asks for another try, a mismatch can go to a moderator, and anything unsure goes to the moderators' new queue (selfie next to the profile photos, Same person or Does not match). Without a key a moderator checks every selfie. The badge shows on the profile card only while every photo has been checked; a new photo is compared with the stored selfie the same way. The selfie is never shown on the profile, is in the data export as a status only, and is deleted with the verification or the account. Five tries a day. | API and unit tests; browser test with a fake camera |

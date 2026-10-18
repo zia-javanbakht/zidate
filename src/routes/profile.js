@@ -6,6 +6,7 @@ import { INTERESTS, TAGS, FACTS, FACT_KEYS } from '../traits.js';
 import { decodeUpload, mimeFor, MAX_PHOTOS } from '../photos.js';
 import { matchId, currentWeek } from '../matching.js';
 import { profileGuide } from '../guide.js';
+import { verificationView } from '../verification.js';
 
 const NO_CONTACT = 'Keep contact details off your profile. You can share them once you match.';
 export const PROMPTS = [
@@ -17,7 +18,7 @@ export const PROMPTS = [
   'A story that still makes me laugh',
 ];
 
-export default function profile({ store, route, HttpError, meView, photos, serial }) {
+export default function profile({ store, route, HttpError, meView, photos, serial, onPhotoAdded }) {
   route('GET', '/api/profile', async ({ user }) => ({
     body: {
       shared: user.shared,
@@ -25,6 +26,7 @@ export default function profile({ store, route, HttpError, meView, photos, seria
       preview: publicProfile(user, { showPhotos: true }),
       hidden: describeHidden(user),
       guide: profileGuide(user),
+      verification: verificationView(user),
       prompts: PROMPTS,
       interests: INTERESTS,
       tags: TAGS,
@@ -191,6 +193,7 @@ export default function profile({ store, route, HttpError, meView, photos, seria
     if (error) throw new HttpError(400, error);
     const id = photos.save(buf, type);
     user.photos.push({ id, at: new Date().toISOString() });
+    onPhotoAdded(user, id);
     return { status: 201, body: { photo: { id, url: `/api/photos/${id}` } } };
   }, { bodyLimit: 4.5 * 1024 * 1024 });
 

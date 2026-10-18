@@ -206,6 +206,7 @@ export default function account(ctx) {
       // Kept only for matching and never shown in the app; included here because it is yours.
       matchingSignals: { summary: summarizeSignals(signalsOf(store, user.id)), raw: signalsOf(store, user.id) },
       photos: (user.photos || []).map((p) => p.id),
+      photoVerification: user.verification ? { status: user.verification.status, at: user.verification.at, checkedPhotos: user.verification.photoIds } : null,
       conversationWithMatchmaker: store.data.conversations[user.id]?.messages || [],
       likes: mine('likes'),
       passes: mine('passes'),
@@ -227,6 +228,7 @@ export default function account(ctx) {
   route('DELETE', '/api/me', async ({ user }) => {
     const id = user.id;
     for (const p of user.photos || []) photos.remove(p.id);
+    if (user.verification?.selfieId) photos.remove(user.verification.selfieId);
     delete store.data.users[id];
     delete store.data.conversations[id];
     forget(store, id);

@@ -1,5 +1,6 @@
 // Settings, notifications, and the moderator view.
 import { h, api, render, setMe, state, toast, ask, field, ago, prefs, applyTheme, live } from './core.js';
+import { verificationQueue } from './verify.js';
 
 export async function settings() {
   const { user } = await api('GET', '/api/me');
@@ -218,6 +219,7 @@ export async function adminView() {
     h('a', { class: 'back', href: '#/settings' }, '← Settings'),
     h('h1', {}, 'Moderation'),
     h('div', { class: 'stat-grid' }, Object.entries(label).map(([k, l]) => h('div', {}, h('b', {}, String(stats[k] ?? 0)), h('span', { class: 'small muted' }, l)))),
+    verificationQueue(),
     h('section', { class: 'card' },
       h('h2', {}, 'Reports'),
       reports.length ? reports.map((r) => h('div', { class: 'report' },

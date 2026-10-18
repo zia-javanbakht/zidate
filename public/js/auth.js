@@ -137,5 +137,5 @@ export function about() {
     h('h2', {}, 'Two people a week'),
     p('Every Monday you get two suggestions, people near you first, and only as far away as you are both happy to go. Like or pass, and tell me why: it makes the next pair better. When you both like each other, you can talk.'),
     h('h2', {}, 'Privacy and safety'),
-    p('Photos can stay hidden until you match. Messages that look abusive are not sent. You can report or unmatch anyone, pause whenever you like, download all your data, and delete your account at any time. Deleting removes everything, including photos and conversations.')));
+    p('Photos can stay hidden until you match. Messages that look abusive are not sent. You can report or unmatch anyone, pause whenever you like, download all your data, and delete your account at any time. Photo verification compares a selfie in a random pose with your photos (by Claude, or by a moderator when the check is unsure); the selfie is never shown on your profile. Deleting removes everything, including photos, your verification selfie and conversations.')));
 }
