@@ -1,9 +1,7 @@
 // The weekly two: see them, decide, widen the search, report.
 import { weeklyPicks, compatibility, currentWeek, available, fillWeek, canWiden, PER_WEEK } from '../matching.js';
 import { queueEvent, askNow } from '../agent/index.js';
-import { TRAIT_KEYS } from '../traits.js';
-import { nearby } from '../cities.js';
-import { learnFromLike, createMatch } from '../social.js';
+import { learnFromLike, createMatch, passEvent } from '../social.js';
 import { cleanText } from '../profile.js';
 import { now } from '../clock.js';
 import { noteDecision } from '../signals.js';
@@ -102,26 +100,4 @@ export default function week(ctx) {
     store.data.reports.push({ id: store.id('r'), by: user.id, about: params.id, reason: cleanText(body.reason, 500) || 'Reported from a suggestion', at: now().toISOString(), status: 'open', source: 'suggestion' });
     return { body: { ok: true } };
   });
-}
-
-// What the "why did you pass" questions may offer. Built here, where both people are known;
-// only neutral labels ever reach the person, never the other person's hidden values.
-function passEvent(user, other) {
-  // Everything both are known on, not only where they differ: which questions get offered
-  // must not depend on the other person's hidden values.
-  const known = TRAIT_KEYS
-    .filter((k) => user.hidden.traits[k].confidence >= 0.2 && other.hidden.traits[k].confidence >= 0.2)
-    .map((k) => ({ trait: k, value: Math.round(other.hidden.traits[k].value * 100) / 100, gap: Math.round(Math.abs(user.hidden.traits[k].value - other.hidden.traits[k].value) * 100) / 100 }));
-  const [mine, theirs] = [user.basics.age, other.basics.age];
-  const approved = other.shared.items.filter((i) => i.status === 'approved').length + (other.shared.bio ? 1 : 0);
-  return {
-    type: 'pass',
-    candidateId: other.id,
-    name: other.name,
-    aspects: known.length >= 3 ? known : [],
-    away: !nearby(user.basics.city, other.basics.city),
-    age: theirs,
-    older: mine && theirs && mine !== theirs ? theirs > mine : null,
-    thin: approved < 2,
-  };
 }

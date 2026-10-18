@@ -1,12 +1,14 @@
 // Matches and messages between people, delivered live.
 import { publicProfile, cleanText } from '../profile.js';
-import { demoReply, icebreakers } from '../social.js';
+import { demoReply, icebreakers, passEvent } from '../social.js';
+import { recordMet, MET } from '../dates.js';
+import { askNow } from '../agent/index.js';
 import { screenMessage } from '../moderation.js';
 import { now } from '../clock.js';
 import { noteMessage } from '../signals.js';
 
 export default function matches(ctx) {
-  const { store, route, HttpError, hub, notify } = ctx;
+  const { store, route, HttpError, hub, notify, serial } = ctx;
 
   function getMatch(user, id) {
     const m = store.data.matches[id];
@@ -61,6 +63,7 @@ export default function matches(ctx) {
         messages: msgs.map((x) => view(x, user)),
         seenByThem: other ? m.seen?.[other.id] || null : null,
         icebreakers: msgs.length || !other ? [] : icebreakers(user, other),
+        met: m.met?.[user.id]?.answer || null,
       },
     };
   }, { saves: true });
@@ -94,6 +97,26 @@ export default function matches(ctx) {
     }
     return { status: 201, body: { message: view(msg, user), reply } };
   });
+
+  // "Did you meet?" from the conversation itself, any time. "Once was enough" hands over to
+  // the matchmaker, who asks why.
+  route('POST', '/api/matches/:id/met', async ({ user, params, body }) => serial(user.id, async () => {
+    const m = getMatch(user, params.id);
+    const other = otherOf(m, user);
+    if (!other) throw new HttpError(404, 'Not found.');
+    if (!MET[body.answer]) throw new HttpError(400, 'Pick one of the answers.');
+    recordMet(store, user, other, body.answer);
+    let ask = false;
+    if (body.answer === 'once') {
+      const convo = store.data.conversations[user.id];
+      // Asked first: they just told us, so it is fresh.
+      convo.events = convo.events.filter((e) => !(e.type === 'met-once' && e.candidateId === other.id));
+      convo.events.unshift({ type: 'met-once', candidateId: other.id, name: other.name, aspects: passEvent(user, other).aspects });
+      if (convo.pending?.kind !== 'feedback') askNow(user, convo);
+      ask = true;
+    }
+    return { body: { met: body.answer, ask } };
+  }));
 
   route('POST', '/api/matches/:id/unmatch', async ({ user, params, body }) => {
     const m = getMatch(user, params.id);

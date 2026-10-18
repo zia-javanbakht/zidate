@@ -21,6 +21,14 @@ async function two({ seed = false } = {}) {
   return { s, a, b, A, B };
 }
 
+// Skip whatever the matchmaker asks until a question matching re comes up.
+async function untilAsked(c, re, max = 12) {
+  let q = (await c.get('/api/chat')).data.messages.at(-1);
+  for (let i = 0; i < max && !re.test(q.text); i++) q = (await c.post('/api/chat', { text: 'skip' })).data.message;
+  assert.match(q.text, re);
+  return q;
+}
+
 async function matched() {
   const t = await two();
   await t.a.post(`/api/week/${t.B.id}`, { decision: 'like' });
@@ -66,4 +74,46 @@ test('a note is dropped when they pass, and a plain like stays private', async (
   assert.equal((await t2.b.get('/api/week')).data.picks[0].likedYou, null);
   await s.close();
   await t2.s.close();
+});
+
+test('"did you meet?": a week on, quick replies teach matching, and still talking is asked again', async () => {
+  const { s, a, b, A, B, match } = await matched();
+  await a.post(`/api/matches/${encodeURIComponent(match.id)}`, { text: 'Hi Ben!' });
+  await b.post(`/api/matches/${encodeURIComponent(match.id)}`, { text: 'Hi Ana!' });
+  clock.advance(8 * 864e5);
+  tick(s.store, s.ctx);
+  // Ana answers in the conversation with the matchmaker.
+  let q = await untilAsked(a, /Did you meet/);
+  assert.ok(q.choices.includes('Yes, and I want to see them again'));
+  const before = JSON.stringify(s.store.data.users[A.id].hidden.preference);
+  await a.post('/api/chat', { text: 'Yes, and I want to see them again' });
+  assert.notEqual(JSON.stringify(s.store.data.users[A.id].hidden.preference), before, 'preferences move toward Ben');
+  assert.equal(s.store.data.signals[A.id].dates[B.id], 'again');
+  const reviews = Object.values(s.store.data.signals[B.id].dateReviews);
+  assert.deepEqual(reviews, [{ answer: 'again' }]);
+  assert.ok(!JSON.stringify(s.store.data.signals[B.id].dateReviews).includes(A.id), 'never names who said it');
+  // Ben is still talking, and is asked again two weeks later; Ana is not.
+  await untilAsked(b, /Did you meet/);
+  await b.post('/api/chat', { text: 'Not yet, we are talking' });
+  clock.advance(15 * 864e5);
+  tick(s.store, s.ctx);
+  await untilAsked(b, /still talking/);
+  assert.ok(!s.store.data.conversations[A.id].events.some((e) => e.type === 'checkin'), 'Ana is not asked again');
+  clock.reset();
+  await s.close();
+});
+
+test('"once was enough" from the conversation: the matchmaker asks why, and "not safe" is reported', async () => {
+  const { s, a, A, B, mid } = await matched();
+  assert.equal((await a.post(`/api/matches/${mid}/met`, { answer: 'nope' })).status, 400);
+  const r = await a.post(`/api/matches/${mid}/met`, { answer: 'once' });
+  assert.deepEqual(r.data, { met: 'once', ask: true });
+  assert.equal((await a.get(`/api/matches/${mid}`)).data.met, 'once');
+  const q = (await a.get('/api/chat')).data.messages.at(-1);
+  assert.match(q.text, /once enough with Ben/);
+  await a.post('/api/chat', { text: 'I did not feel safe' });
+  const report = s.store.data.reports.find((x) => x.about === B.id && x.by === A.id);
+  assert.equal(report.source, 'date');
+  assert.equal(Object.values(s.store.data.signals[B.id].dateReviews)[0].reason, 'unsafe');
+  await s.close();
 });
