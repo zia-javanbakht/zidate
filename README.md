@@ -1,6 +1,6 @@
 # ziDate
 
-A dating app with no swiping. You talk with an AI matchmaker, it builds two profiles for you, and every Monday it introduces you to two people.
+A dating app with no swiping. You talk with an AI matchmaker, it builds two profiles for you, and once a week, on the day you choose, it introduces you to two people.
 
 - **Hidden profile**: eight traits (social energy, adventure, ambition, family, planning, intellect, spirituality, activity), each with a confidence, plus tags, dealbreakers, values, what you have said you want in a partner, and private notes. Only used for matching. Nobody else ever sees it. You can see it, and correct it with "Not me", which makes the matchmaker ask you directly.
 - **Shared profile**: what matches see. The matchmaker *suggests* lines from your answers ("My ideal Sunday", "What makes me laugh", a bio, interests). Nothing appears until you approve it, and contact details are never allowed on it.

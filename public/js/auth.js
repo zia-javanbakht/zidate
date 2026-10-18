@@ -31,7 +31,7 @@ export function welcome() {
     submit.disabled = true;
     try {
       const body = { email: email.input.value, password: pass.input.value };
-      if (mode === 'signup') body.name = name.input.value;
+      if (mode === 'signup') Object.assign(body, { name: name.input.value, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
       const { user } = await api('POST', mode === 'signup' ? '/api/signup' : '/api/login', body);
       setMe(user);
       location.hash = mode === 'signup' || !user.ready ? '#/talk' : '#/week';

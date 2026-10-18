@@ -81,3 +81,4 @@ Asked for: complete the missing components and features, with up to 50 suggestio
 | 68 | Ops | GitHub Actions workflow: unit, API and browser tests, plus a Docker build. | Not run (no repository yet) |
 | 69 | Bug | Pausing mid-week still showed the week's picks. Paused now always wins. | Found by the new browser test |
 | 70 | Bug | Dialog dropdowns started empty, so "Add a line" always failed. Also: match messages now have their own bubble, and the forgot-password page keeps the email you typed. | Found by the new browser test; screenshots |
+| 71 | Feature | Pick the day your weekly two arrive (Settings), at midnight in your own time zone (taken from the browser at sign-up). Changing the day keeps the current pair, so a week is never repeated or skipped. | Unit tests for day/time-zone weeks and day changes; API test; screenshots |

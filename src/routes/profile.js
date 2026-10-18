@@ -4,8 +4,7 @@ import { basicsDone, describeHidden, publicProfile, cleanText, hasContactInfo, s
 import { askNow } from '../agent/index.js';
 import { INTERESTS, TAGS } from '../traits.js';
 import { decodeUpload, mimeFor, MAX_PHOTOS } from '../photos.js';
-import { matchId } from '../matching.js';
-import { weekKey } from '../clock.js';
+import { matchId, currentWeek } from '../matching.js';
 
 const NO_CONTACT = 'Keep contact details off your profile. You can share them once you match.';
 export const PROMPTS = [
@@ -149,7 +148,7 @@ export default function profile({ store, route, HttpError, meView, photos }) {
     if (viewer.id === owner.id) return true;
     if (store.data.matches[matchId(viewer.id, owner.id)]) return true;
     if (settingsOf(owner).photosAfterMatch) return false;
-    return Boolean(store.data.weeks[`${viewer.id}:${weekKey()}`]?.picks.some((p) => p.id === owner.id));
+    return Boolean(store.data.weeks[`${viewer.id}:${currentWeek(viewer)}`]?.picks.some((p) => p.id === owner.id));
   }
 
   route('GET', '/api/photos/:id', async ({ user, params, res }) => {

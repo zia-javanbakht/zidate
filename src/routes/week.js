@@ -1,9 +1,9 @@
 // The weekly two: see them, decide, widen the search, report.
-import { weeklyPicks, compatibility } from '../matching.js';
+import { weeklyPicks, compatibility, currentWeek } from '../matching.js';
 import { queueEvent } from '../agent/index.js';
 import { learnFromLike, createMatch } from '../social.js';
 import { cleanText } from '../profile.js';
-import { weekKey, now } from '../clock.js';
+import { now } from '../clock.js';
 
 export default function week(ctx) {
   const { store, route, HttpError } = ctx;
@@ -16,7 +16,7 @@ export default function week(ctx) {
     const cur = user.basics.ageRange ?? 8;
     const next = steps.find((s) => s > cur) ?? cur;
     user.basics.ageRange = next;
-    const key = `${user.id}:${weekKey()}`;
+    const key = `${user.id}:${currentWeek(user)}`;
     const wk = store.data.weeks[key];
     // Keep decisions already made; only refill when the week had room.
     if (wk && wk.picks.every((p) => !p.decision)) delete store.data.weeks[key];
@@ -26,7 +26,7 @@ export default function week(ctx) {
   route('POST', '/api/week/:id', async ({ user, params, body }) => {
     const decision = body.decision;
     if (!['like', 'pass'].includes(decision)) throw new HttpError(400, 'Decide like or pass.');
-    const wk = store.data.weeks[`${user.id}:${weekKey()}`];
+    const wk = store.data.weeks[`${user.id}:${currentWeek(user)}`];
     const pick = wk?.picks.find((p) => p.id === params.id);
     if (!pick) throw new HttpError(404, 'That person is not in your suggestions this week.');
     if (pick.decision) throw new HttpError(409, 'You already decided.');
@@ -49,7 +49,7 @@ export default function week(ctx) {
 
   // Report someone straight from a suggestion. They are never suggested again.
   route('POST', '/api/week/:id/report', async ({ user, params, body }) => {
-    const wk = store.data.weeks[`${user.id}:${weekKey()}`];
+    const wk = store.data.weeks[`${user.id}:${currentWeek(user)}`];
     const pick = wk?.picks.find((p) => p.id === params.id);
     if (!pick) throw new HttpError(404, 'That person is not in your suggestions this week.');
     pick.decision ||= 'pass';
