@@ -235,7 +235,7 @@ export default function account(ctx) {
     endSessions(id);
     for (const [t, v] of Object.entries(store.data.tokens || {})) if (v.userId === id) delete store.data.tokens[t];
     for (const k of Object.keys(store.data.weeks)) if (k.startsWith(`${id}:`)) delete store.data.weeks[k];
-    for (const table of [store.data.likes, store.data.passes, store.data.blocks]) {
+    for (const table of [store.data.likes, store.data.passes, store.data.blocks, store.data.likeNotes || {}]) {
       for (const k of Object.keys(table)) if (k.split('>').includes(id)) delete table[k];
     }
     for (const [mid, m] of Object.entries(store.data.matches)) {

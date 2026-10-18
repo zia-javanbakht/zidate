@@ -7,6 +7,8 @@ import { learnFromLike, createMatch } from '../social.js';
 import { cleanText } from '../profile.js';
 import { now } from '../clock.js';
 import { noteDecision } from '../signals.js';
+import { screenMessage } from '../moderation.js';
+import { settingsOf } from '../profile.js';
 
 export default function week(ctx) {
   const { store, route, HttpError, serial } = ctx;
@@ -41,13 +43,18 @@ export default function week(ctx) {
     const other = store.data.users[params.id];
     if (!available(store, user, other)) throw new HttpError(404, 'That person is no longer available.');
     if (pick.decision) throw new HttpError(409, 'You already decided.');
+    const liked = decision === 'like' ? likedPart(user, other, body) : null;
     pick.decision = decision;
     noteDecision(store, user, other, { liked: decision === 'like', shownAt: wk.createdAt });
     const convo = store.data.conversations[user.id];
     let match = null;
-    if (decision === 'pass') store.data.passes[`${user.id}>${other.id}`] = now().toISOString();
+    if (decision === 'pass') {
+      store.data.passes[`${user.id}>${other.id}`] = now().toISOString();
+      delete store.data.likeNotes?.[`${other.id}>${user.id}`]; // their note has been read and answered
+    }
     if (decision === 'like') {
       store.data.likes[`${user.id}>${other.id}`] = now().toISOString();
+      if (liked) (store.data.likeNotes ||= {})[`${user.id}>${other.id}`] = { ...liked, at: now().toISOString() };
       learnFromLike(user, other);
       // Demo people answer instantly, and only if they would like this person too.
       if (other.demo && compatibility(other, user) >= 0.6) store.data.likes[`${other.id}>${user.id}`] = now().toISOString();
@@ -60,6 +67,30 @@ export default function week(ctx) {
     } else if (!match) queueEvent(convo, { type: decision, candidateId: other.id, name: other.name });
     return { body: { decision, match: match ? { id: match.id } : null } };
   }));
+
+  // Like one particular line or photo, optionally with a note (as on Hinge). It reaches
+  // them on their own suggestion card, and opens the conversation once you match.
+  function likedPart(user, other, body) {
+    const on = body.on;
+    const note = cleanText(body.note, 200);
+    if (!on && !note) return null;
+    let part = null;
+    if (on?.kind === 'item') {
+      const item = other.shared.items.filter((i) => i.status === 'approved')[Number(on.index)];
+      if (!item) throw new HttpError(400, 'That line is no longer on their profile.');
+      part = { kind: 'item', prompt: item.prompt || null, text: item.text };
+    } else if (on?.kind === 'photo') {
+      // Only a photo this person was allowed to see.
+      const photo = settingsOf(other).photosAfterMatch ? null : (other.photos || [])[Number(on.index)];
+      if (!photo) throw new HttpError(400, 'That photo is not available.');
+      part = { kind: 'photo', photoId: photo.id };
+    } else if (on) throw new HttpError(400, 'Like a line or a photo.');
+    if (note) {
+      const problem = screenMessage(store, user, note, { noContact: true, at: now().toISOString() });
+      if (problem) throw new HttpError(422, problem);
+    }
+    return { on: part, note };
+  }
 
   // Report someone straight from a suggestion. They are never suggested again.
   route('POST', '/api/week/:id/report', async ({ user, params, body }) => {

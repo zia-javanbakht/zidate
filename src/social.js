@@ -4,7 +4,7 @@ import { blendTrait } from './profile.js';
 import { matchId } from './matching.js';
 import { queueEvent } from './agent/index.js';
 import { now } from './clock.js';
-import { noteMatch, noteCheckin } from './signals.js';
+import { noteMatch, noteCheckin, noteMessage } from './signals.js';
 
 // Liking someone is also a signal: nudge preferences a little toward them. Likes alone
 // never take a preference past LIKE_CAP, so what the person told us keeps the upper hand
@@ -28,6 +28,16 @@ export function createMatch(ctx, a, b) {
   const m = { id, users: [a.id, b.id], createdAt: now().toISOString(), seen: { [a.id]: now().toISOString() } };
   store.data.matches[id] = m;
   store.data.messages[id] = [];
+  // A note sent with a like becomes the first message, the earlier like first.
+  const notes = store.data.likeNotes || {};
+  const sent = [[b, a], [a, b]].map(([x, y]) => [x, notes[`${x.id}>${y.id}`]]).filter(([, n]) => n)
+    .sort(([, p], [, q]) => p.at.localeCompare(q.at));
+  for (const [x, n] of sent) {
+    store.data.messages[id].push({ from: x.id, text: n.note || (n.on?.kind === 'photo' ? 'Liked your photo.' : 'Liked this.'), at: n.at, ...(n.on ? { about: n.on } : {}) });
+    noteMessage(store, x, store.data.messages[id]);
+  }
+  delete notes[`${a.id}>${b.id}`];
+  delete notes[`${b.id}>${a.id}`];
   noteMatch(store, a);
   noteMatch(store, b);
   for (const [x, y] of [[a, b], [b, a]]) {

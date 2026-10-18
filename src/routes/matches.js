@@ -1,7 +1,7 @@
 // Matches and messages between people, delivered live.
 import { publicProfile, cleanText } from '../profile.js';
 import { demoReply, icebreakers } from '../social.js';
-import { isAbusive, STRIKES_BEFORE_REPORT } from '../moderation.js';
+import { screenMessage } from '../moderation.js';
 import { now } from '../clock.js';
 import { noteMessage } from '../signals.js';
 
@@ -14,7 +14,11 @@ export default function matches(ctx) {
     return m;
   }
   const otherOf = (m, user) => store.data.users[m.users.find((u) => u !== user.id)];
-  const view = (x, user) => ({ text: x.text, at: x.at, mine: x.from === user.id });
+  const view = (x, user) => ({
+    text: x.text, at: x.at, mine: x.from === user.id,
+    // A like on one line or photo opens the conversation, quoted above the note.
+    ...(x.about ? { about: x.about.kind === 'photo' ? { photo: `/api/photos/${x.about.photoId}` } : { prompt: x.about.prompt, text: x.about.text } } : {}),
+  });
 
   route('GET', '/api/matches', async ({ user }) => {
     const list = Object.values(store.data.matches)
@@ -66,13 +70,8 @@ export default function matches(ctx) {
     const text = cleanText(body.text, 1000);
     if (!text) throw new HttpError(400, 'Say something first.');
     const other = otherOf(m, user);
-    if (isAbusive(text)) {
-      user.strikes = (user.strikes || 0) + 1;
-      if (user.strikes === STRIKES_BEFORE_REPORT) {
-        store.data.reports.push({ id: store.id('r'), by: 'system', about: user.id, reason: `Automatic: ${STRIKES_BEFORE_REPORT} messages blocked as abusive.`, at: now().toISOString(), status: 'open', source: 'filter' });
-      }
-      throw new HttpError(422, 'That message looks hurtful, so it was not sent. Please keep it kind.');
-    }
+    const problem = screenMessage(store, user, text, { at: now().toISOString() });
+    if (problem) throw new HttpError(422, problem);
     const msg = { from: user.id, text, at: now().toISOString() };
     store.data.messages[m.id].push(msg);
     noteMessage(store, user, store.data.messages[m.id]);

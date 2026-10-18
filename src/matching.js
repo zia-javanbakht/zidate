@@ -307,11 +307,20 @@ export function weeklyPicks(store, user) {
         const other = store.data.users[p.id];
         const matched = Boolean(store.data.matches[matchId(user.id, other.id)]);
         const showPhotos = matched || !settingsOf(other).photosAfterMatch;
-        return { ...publicProfile(other, { showPhotos }), reason: reason(user, other), decision: p.decision, matchId: matched ? matchId(user.id, other.id) : null };
+        return { ...publicProfile(other, { showPhotos }), reason: reason(user, other), decision: p.decision, matchId: matched ? matchId(user.id, other.id) : null, likedYou: p.decision ? null : likedYou(store, other, user) };
       }),
     // Offer to widen the search when this week came up short.
     widen: week.picks.length < PER_WEEK && canWiden(user),
   };
+}
+
+// What someone said when they liked one part of this person's profile. A plain like stays
+// private until it is mutual; a note is meant to be read, so it shows on their card.
+function likedYou(store, from, to) {
+  const n = store.data.likeNotes?.[`${from.id}>${to.id}`];
+  if (!n) return null;
+  const on = n.on?.kind === 'photo' ? { photo: `/api/photos/${n.on.photoId}` } : n.on ? { prompt: n.on.prompt, text: n.on.text } : null;
+  return { note: n.note || '', on };
 }
 
 export function matchId(a, b) {
