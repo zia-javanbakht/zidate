@@ -4,6 +4,7 @@ import { basicsDone } from './profile.js';
 import { isReady, publicProfile, settingsOf } from './profile.js';
 import { normalizeCity } from './cities.js';
 import { weekKey, nextWeekStart, now } from './clock.js';
+import { lookBoost } from './looks.js';
 import { revealedPreferences, likeChance, responsiveness, popularity, hoursOverlap, noteShown, reportCounts } from './signals.js';
 
 export const PER_WEEK = 2;
@@ -137,6 +138,8 @@ export function signalBoost(store, a, b, reports = reportCounts(store)) {
   boost -= (popularity(sb) - 0.5) * 0.06;
   const hours = hoursOverlap(sa, sb);
   if (hours != null) boost += (hours - 0.5) * 0.04;
+  // Pishi Plus: the styles a has gone for in photos.
+  boost += lookBoost(store, a, b);
   return boost;
 }
 

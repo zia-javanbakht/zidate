@@ -6,11 +6,13 @@
 //
 // Kept apart from the user record (store.data.signals) so no profile or "me" view can
 // leak it by accident. Nothing here may record health, ethnicity, sexuality beyond what
-// the person chose in the basics, finances, or judgements of looks.
+// the person chose in the basics, finances, or judgements of how attractive anyone is.
+// The looks part (Pishi Plus, see looks.js) only counts fixed style words.
 import { TRAIT_KEYS } from './traits.js';
 import { normalizeCity } from './cities.js';
 import { cleanText } from './profile.js';
 import { now } from './clock.js';
+import { lookLeanings } from './looks.js';
 
 const MAX_OBSERVATIONS = 30;
 // Revealed preferences only count once there is enough behaviour to go on.
@@ -34,6 +36,8 @@ function blank() {
     received: { shown: 0, liked: 0 },
     matches: { started: 0, replied: 0, firstMessages: 0, ghosted: 0, replyMin: 0, timed: 0 },
     observations: [],
+    // Style words in the photos of people they liked and passed on (looks.js, Plus only).
+    looks: { nLiked: 0, nPassed: 0, liked: {}, passed: {} },
   };
 }
 
@@ -258,5 +262,6 @@ export function summarizeSignals(sig) {
     responsiveness: responsiveness(sig),
     activeHoursUtc: sig.activeHours,
     observations: sig.observations.map((o) => o.text),
+    looksFromPhotos: { decisions: sig.looks.nLiked + sig.looks.nPassed, leanings: lookLeanings(sig) },
   };
 }

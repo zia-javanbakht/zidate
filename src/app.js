@@ -13,6 +13,8 @@ import { createMailer } from './mailer.js';
 import { createPhotoStore } from './photos.js';
 import { now } from './clock.js';
 import { noteActive } from './signals.js';
+import { createLooks, isPlus } from './looks.js';
+import { pickVision } from './agent/vision.js';
 import account from './routes/account.js';
 import chat from './routes/chat.js';
 import profile from './routes/profile.js';
@@ -60,6 +62,7 @@ export function createApp(store, opts = {}) {
     photoDir = null,
     baseUrl = 'http://localhost:3000',
     log = false,
+    vision = pickVision(),
   } = opts;
   // People stored before the profile gained new parts get them now.
   for (const u of Object.values(store.data.users)) upgradeUser(u);
@@ -68,12 +71,13 @@ export function createApp(store, opts = {}) {
   const { route, match } = router();
   const hub = createHub();
   const photos = createPhotoStore(photoDir);
+  const looks = createLooks({ store, photos, vision });
 
   const cookie = (token, maxAge) => `sid=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secureCookies ? '; Secure' : ''}`;
   const isAdmin = (user) => Boolean(user && admins.includes(user.email));
 
   const ctx = {
-    store, route, hub, mailer, photos, baseUrl, HttpError, isAdmin,
+    store, route, hub, mailer, photos, looks, baseUrl, HttpError, isAdmin,
     newUser: (o) => newUser(store, o),
     cookie,
     startSession(user) {
@@ -108,6 +112,7 @@ export function createApp(store, opts = {}) {
         unread: unreadCount(user.id),
         notifications: (store.data.notifications[user.id] || []).filter((n) => !n.read).length,
         admin: isAdmin(user),
+        plus: isPlus(user),
       };
     },
     // In-app notification, pushed live; emailed when the person is not online and wants that kind.

@@ -4,12 +4,12 @@ import { queueEvent, askNow } from '../agent/index.js';
 import { TRAIT_KEYS } from '../traits.js';
 import { normalizeCity } from '../cities.js';
 import { learnFromLike, createMatch } from '../social.js';
-import { cleanText } from '../profile.js';
+import { cleanText, settingsOf } from '../profile.js';
 import { now } from '../clock.js';
 import { noteDecision } from '../signals.js';
 
 export default function week(ctx) {
-  const { store, route, HttpError, serial } = ctx;
+  const { store, route, HttpError, serial, looks } = ctx;
 
   route('GET', '/api/week', async ({ user }) => ({ body: weeklyPicks(store, user) }), { saves: true });
 
@@ -43,6 +43,8 @@ export default function week(ctx) {
     if (pick.decision) throw new HttpError(409, 'You already decided.');
     pick.decision = decision;
     noteDecision(store, user, other, { liked: decision === 'like', shownAt: wk.createdAt });
+    // Looks only say something when the photos were there to see before deciding.
+    if (!settingsOf(other).photosAfterMatch) looks.learn(user, other, decision === 'like');
     const convo = store.data.conversations[user.id];
     let match = null;
     if (decision === 'pass') store.data.passes[`${user.id}>${other.id}`] = now().toISOString();

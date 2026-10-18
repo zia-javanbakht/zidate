@@ -134,6 +134,7 @@ export function about() {
     p('The shared profile is what your matches see. Your matchmaker only suggests lines for it; nothing appears until you approve it, and you can write your own.'),
     p('The hidden profile is how I choose people for you: personality, values, dealbreakers and what you want in a partner. Only you can see it, under You, and you can correct anything that is wrong.'),
     p('I also learn from what you do: who you like and pass on, how conversations with matches go, and when you are usually around. These signals are only used to choose people for you. They are not shown in the app, and they are included when you download your data.'),
+    p('With Pishi Plus, I also learn which looks you go for. An AI model describes each profile photo once, in plain style words such as long hair, glasses, smart clothes or outdoors, and I notice which of those you tend to like when you could see someone\'s photos before deciding. It never records ethnicity, skin colour, body shape or size, age, or how attractive anyone is. Like the other signals, this is only used to choose people for you.'),
     h('h2', {}, 'Two people a week'),
     p('Every Monday you get two suggestions, people in your city first. Like or pass, and tell me why: it makes the next pair better. When you both like each other, you can talk.'),
     h('h2', {}, 'Privacy and safety'),
