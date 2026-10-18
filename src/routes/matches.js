@@ -3,6 +3,7 @@ import { publicProfile, cleanText } from '../profile.js';
 import { demoReply, icebreakers } from '../social.js';
 import { isAbusive, STRIKES_BEFORE_REPORT } from '../moderation.js';
 import { now } from '../clock.js';
+import { noteMessage } from '../signals.js';
 
 export default function matches(ctx) {
   const { store, route, HttpError, hub, notify } = ctx;
@@ -58,7 +59,7 @@ export default function matches(ctx) {
         icebreakers: msgs.length || !other ? [] : icebreakers(user, other),
       },
     };
-  });
+  }, { saves: true });
 
   route('POST', '/api/matches/:id', async ({ user, params, body }) => {
     const m = getMatch(user, params.id);
@@ -74,6 +75,7 @@ export default function matches(ctx) {
     }
     const msg = { from: user.id, text, at: now().toISOString() };
     store.data.messages[m.id].push(msg);
+    noteMessage(store, user, store.data.messages[m.id]);
     m.seen = { ...m.seen, [user.id]: msg.at };
     if (other) {
       hub.publish(other.id, 'message', { matchId: m.id, message: view(msg, other) });

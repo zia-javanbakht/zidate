@@ -1,11 +1,11 @@
-# ziDate: a single Node process with a JSON file store. Mount /data to keep accounts and photos.
+# Pishi: a single Node process with a JSON file store. Mount /data to keep accounts and photos.
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production \
     PORT=3000 \
-    ZIDATE_DB=/data/db.json \
-    ZIDATE_PHOTOS=/data/photos \
-    ZIDATE_OUTBOX=/data/outbox
+    PISHI_DB=/data/db.json \
+    PISHI_PHOTOS=/data/photos \
+    PISHI_OUTBOX=/data/outbox
 COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev 2>/dev/null || npm install --omit=dev
 COPY src ./src

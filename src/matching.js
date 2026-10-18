@@ -1,9 +1,10 @@
 // Weekly suggestions: exactly two people per week, picked from hidden profiles.
-import { TRAIT_KEYS, TOPICS } from './traits.js';
+import { TRAIT_KEYS, CORE_TRAITS, TOPICS } from './traits.js';
 import { basicsDone } from './profile.js';
 import { isReady, publicProfile, settingsOf } from './profile.js';
 import { normalizeCity } from './cities.js';
 import { weekKey, nextWeekStart, now } from './clock.js';
+import { revealedPreferences, likeChance, responsiveness, popularity, hoursOverlap, noteShown, reportCounts } from './signals.js';
 
 export const PER_WEEK = 2;
 
@@ -24,6 +25,9 @@ function ageOk(a, b) {
   if (!x || !y) return false;
   const gap = Math.abs(x - y);
   if (gap > (a.basics.ageRange ?? DEFAULT_AGE_RANGE) || gap > (b.basics.ageRange ?? DEFAULT_AGE_RANGE)) return false;
+  // Limits someone set after passing on a person who was too old or too young for them.
+  const within = (p, age) => (p.hidden.limits?.ageMin ?? 0) <= age && age <= (p.hidden.limits?.ageMax ?? 999);
+  if (!within(a, y) || !within(b, x)) return false;
   return Math.min(x, y) >= Math.max(x, y) / 2 + 7;
 }
 
@@ -76,9 +80,24 @@ export function fit(a, b) {
   let score = den ? num / den : 0.5;
   // Shared values and interests are a modest bonus.
   const overlap = (x, y) => (x.length && y.length ? x.filter((v) => y.includes(v)).length / Math.min(x.length, y.length) : 0);
-  score = score * 0.8 + overlap(a.hidden.values, b.hidden.values) * 0.1 + overlap(a.shared.interests, b.shared.interests) * 0.1;
+  // Interests they mentioned count for matching even before they show them; only approved
+  // ones are ever named to the other person (see reason()).
+  const said = (u) => [...u.shared.interests, ...(u.shared.suggestedInterests || [])];
+  score = score * 0.8 + overlap(a.hidden.values, b.hidden.values) * 0.1 + overlap(said(a), said(b)) * 0.1;
   if (sameCity(a, b)) score += 0.05;
-  return Math.min(1, score);
+  // Small nudges from the categorical parts of the hidden profile.
+  const [la, lb] = [a.hidden.aspects?.loveLanguage, b.hidden.aspects?.loveLanguage];
+  if (la && la === lb) score += 0.03;
+  const pace = [a.hidden.aspects?.pace, b.hidden.aspects?.pace].sort().join();
+  if (pace === 'fast,slow') score -= 0.05;
+  if (a.hidden.limits?.prefersDetail) score += richness(b) >= 2 ? 0.04 : -0.04;
+  return Math.max(0, Math.min(1, score));
+}
+
+// How much someone shares on their profile: approved lines, a bio, and shown facts.
+function richness(u) {
+  const facts = Object.values(u.shared.facts || {}).filter((f) => f.status === 'approved').length;
+  return u.shared.items.filter((i) => i.status === 'approved').length + (u.shared.bio ? 1 : 0) + Math.floor(facts / 3);
 }
 
 // Mutual score: both people should be glad to see each other.
@@ -87,6 +106,38 @@ export function compatibility(a, b) {
   const y = fit(b, a);
   // Geometric mean punishes one-sided matches.
   return Math.sqrt(x * y);
+}
+
+// Adjustment from what people do rather than what they say (see signals.js).
+// Small on purpose: behaviour refines the picks, it never overrides the conversation.
+export function signalBoost(store, a, b, reports = reportCounts(store)) {
+  if (!store.data.signals) return 0;
+  const [sa, sb] = [store.data.signals[a.id], store.data.signals[b.id]];
+  let boost = 0;
+  // a has tended to like people like b (and b people like a).
+  for (const [sig, x, y] of [[sa, a, b], [sb, b, a]]) {
+    const rev = revealedPreferences(sig);
+    let num = 0;
+    let den = 0;
+    for (const [k, { target, weight }] of Object.entries(rev)) {
+      const t = y.hidden.traits[k];
+      if (t.confidence < 0.2) continue;
+      num += weight * (1 - Math.abs(target - t.value));
+      den += weight;
+    }
+    if (den) boost += (num / den - 0.5) * 0.16;
+    const chance = likeChance(sig, x, y);
+    if (chance != null) boost += (chance - 0.5) * 0.08;
+  }
+  // People who leave their matches unanswered, or who have been reported, come later.
+  const r = responsiveness(sb);
+  if (r != null) boost += (r - 0.7) * 0.12;
+  boost -= Math.min(0.15, (reports.get(b.id) || 0) * 0.05);
+  // Spread attention: someone almost everyone likes does not need to be in every pair.
+  boost -= (popularity(sb) - 0.5) * 0.06;
+  const hours = hoursOverlap(sa, sb);
+  if (hours != null) boost += (hours - 0.5) * 0.04;
+  return boost;
 }
 
 // A reason shown to the person. Built only from shared information, never hidden traits.
@@ -102,19 +153,30 @@ function sharedReason(a, b) {
   return 'Our conversations suggest you would get on.';
 }
 
+// Everyone ever suggested to this person. Kept as an index so ranking does not scan every
+// week of every person; built once from the weeks for data saved before the index existed.
 function everSuggested(store, userId) {
-  const seen = new Set();
-  for (const [key, week] of Object.entries(store.data.weeks)) {
-    if (!key.startsWith(`${userId}:`)) continue;
-    for (const p of week.picks) seen.add(p.id);
+  store.data.suggested ||= {};
+  if (!store.data.suggested[userId]) {
+    const ids = new Set();
+    for (const [key, week] of Object.entries(store.data.weeks)) {
+      if (key.startsWith(`${userId}:`)) for (const p of week.picks) ids.add(p.id);
+    }
+    store.data.suggested[userId] = [...ids];
   }
-  return seen;
+  return new Set(store.data.suggested[userId]);
 }
 
 // Someone who already said no, or an unmatched/reported pair, is never suggested.
 function closed(store, a, b) {
   const d = store.data;
   return Boolean(d.passes[`${b.id}>${a.id}`] || d.blocks[`${a.id}>${b.id}`] || d.blocks[`${b.id}>${a.id}`]);
+}
+
+// Can this person still be shown to, liked by or matched with `user`?
+export function available(store, user, other) {
+  if (!other || inactive(other)) return false;
+  return !(store.data.blocks[`${user.id}>${other.id}`] || store.data.blocks[`${other.id}>${user.id}`]);
 }
 
 // Each person picks the day their two arrive, at midnight in their own time zone.
@@ -140,6 +202,37 @@ export function nextWeek(user, date = now()) {
   return next;
 }
 
+// Everyone who could be suggested to this person now, best first.
+function rank(store, user) {
+  const seen = everSuggested(store, user.id);
+  const reports = reportCounts(store);
+  return Object.values(store.data.users)
+    .filter((o) => !seen.has(o.id) && isReady(o) && eligible(user, o) && !closed(store, user, o))
+    // Either person may have asked to only meet people in their own city.
+    .filter((o) => sameCity(user, o) || !(user.hidden.limits?.localOnly || o.hidden.limits?.localOnly))
+    // Someone who already liked this person is a likely mutual match: give them a lift.
+    .map((o) => ({ o, s: compatibility(user, o) + signalBoost(store, user, o, reports) + (store.data.likes[`${o.id}>${user.id}`] ? 0.15 : 0), local: sameCity(user, o) }))
+    // People nearby come first; only widen the search when the city runs out.
+    .sort((p, q) => q.local - p.local || q.s - p.s || p.o.id.localeCompare(q.o.id));
+}
+
+// Top up a week to PER_WEEK people, keeping whoever is already in it.
+export function fillWeek(store, user, week) {
+  const fresh = rank(store, user).slice(0, Math.max(0, PER_WEEK - week.picks.length));
+  for (const { o, s } of fresh) {
+    week.picks.push({ id: o.id, score: Math.round(s * 100) / 100, decision: null });
+    store.data.suggested[user.id].push(o.id);
+    noteShown(store, o);
+  }
+  return fresh.length;
+}
+
+// Limits that make a week come up short, which "widen" can lift.
+export function canWiden(user) {
+  const l = user.hidden.limits || {};
+  return (user.basics.ageRange ?? DEFAULT_AGE_RANGE) < 20 || Boolean(l.localOnly || l.ageMin != null || l.ageMax != null);
+}
+
 // Get (or create, once per week) this person's suggestions.
 export function weeklyPicks(store, user) {
   const wk = currentWeek(user);
@@ -152,27 +245,22 @@ export function weeklyPicks(store, user) {
     if (!isReady(user)) {
       // Tell the person what is still missing, in plain words.
       const missing = basicsDone(user)
-        ? TRAIT_KEYS.filter((k) => user.hidden.traits[k].confidence < 0.25).slice(0, 3).map((k) => TOPICS[k])
+        ? CORE_TRAITS.filter((k) => user.hidden.traits[k].confidence < 0.25).slice(0, 3).map((k) => TOPICS[k])
         : ['a few basics (who you are looking for, your age and city)'];
       return { week: wk, ready: false, missing, picks: [], next: nextAt };
     }
-    const seen = everSuggested(store, user.id);
-    const ranked = Object.values(store.data.users)
-      .filter((o) => !seen.has(o.id) && isReady(o) && eligible(user, o) && !closed(store, user, o))
-      // Someone who already liked this person is a likely mutual match: give them a lift.
-      .map((o) => ({ o, s: compatibility(user, o) + (store.data.likes[`${o.id}>${user.id}`] ? 0.15 : 0), local: sameCity(user, o) }))
-      // People nearby come first; only widen the search when the city runs out.
-      .sort((p, q) => q.local - p.local || q.s - p.s || p.o.id.localeCompare(q.o.id));
-    week = { createdAt: now().toISOString(), picks: ranked.slice(0, PER_WEEK).map(({ o, s }) => ({ id: o.id, score: Math.round(s * 100) / 100, decision: null })) };
+    week = { createdAt: now().toISOString(), picks: [] };
     store.data.weeks[key] = week;
+    fillWeek(store, user, week);
     store.save();
   }
   return {
     week: wk,
     ready: true,
     next: nextAt,
+    // Someone who has since paused, been suspended or blocked drops out of this week too.
     picks: week.picks
-      .filter((p) => store.data.users[p.id])
+      .filter((p) => available(store, user, store.data.users[p.id]))
       .map((p) => {
         const other = store.data.users[p.id];
         const matched = Boolean(store.data.matches[matchId(user.id, other.id)]);
@@ -180,7 +268,7 @@ export function weeklyPicks(store, user) {
         return { ...publicProfile(other, { showPhotos }), reason: reason(user, other), decision: p.decision, matchId: matched ? matchId(user.id, other.id) : null };
       }),
     // Offer to widen the search when this week came up short.
-    widen: week.picks.length < PER_WEEK && (user.basics.ageRange ?? DEFAULT_AGE_RANGE) < 15,
+    widen: week.picks.length < PER_WEEK && canWiden(user),
   };
 }
 

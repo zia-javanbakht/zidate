@@ -39,7 +39,7 @@ export function router() {
   const route = (method, pattern, handler, opts = {}) => {
     const keys = [];
     const re = new RegExp(`^${pattern.replace(/:(\w+)/g, (_, k) => (keys.push(k), '([^/]+)'))}$`);
-    routes.push({ method, re, keys, handler, auth: opts.auth !== false, admin: Boolean(opts.admin), bodyLimit: opts.bodyLimit, raw: Boolean(opts.raw) });
+    routes.push({ method, re, keys, handler, auth: opts.auth !== false, admin: Boolean(opts.admin), bodyLimit: opts.bodyLimit, raw: Boolean(opts.raw), saves: Boolean(opts.saves) });
   };
   const match = (method, pathname) => {
     const r = routes.find((x) => x.method === method && x.re.test(pathname));

@@ -26,7 +26,7 @@ const stopJobs = startScheduler(store, handler.ctx);
 const ping = setInterval(() => handler.hub.ping(), 25000); // keeps live streams open through proxies
 
 server.listen(cfg.port, () => {
-  console.log(`ziDate ${VERSION} on ${cfg.baseUrl} (matchmaker: ${pickEngine().name})`);
+  console.log(`Pishi ${VERSION} on ${cfg.baseUrl} (matchmaker: ${pickEngine().name})`);
 });
 
 function shutdown(sig) {

@@ -6,12 +6,13 @@ import { fileURLToPath } from 'node:url';
 import { hashPassword, newToken, parseCookies } from './auth.js';
 import { emptyHidden } from './traits.js';
 import { newConversation, pickEngine } from './agent/index.js';
-import { completeness, isReady, settingsOf } from './profile.js';
+import { completeness, isReady, settingsOf, upgradeUser } from './profile.js';
 import { HttpError, readBody, send, router, limiter } from './http.js';
 import { createHub } from './events.js';
 import { createMailer } from './mailer.js';
 import { createPhotoStore } from './photos.js';
 import { now } from './clock.js';
+import { noteActive } from './signals.js';
 import account from './routes/account.js';
 import chat from './routes/chat.js';
 import profile from './routes/profile.js';
@@ -41,7 +42,7 @@ export function newUser(store, { name, email, password }) {
     createdAt: now().toISOString(),
     basics: { gender: null, seeking: null, age: null, city: null },
     hidden: emptyHidden(),
-    shared: { bio: '', bioDraft: '', interests: [], items: [] },
+    shared: { bio: '', bioDraft: '', interests: [], items: [], facts: {} },
     photos: [],
   };
   settingsOf(user);
@@ -60,7 +61,10 @@ export function createApp(store, opts = {}) {
     baseUrl = 'http://localhost:3000',
     log = false,
   } = opts;
+  // People stored before the profile gained new parts get them now.
+  for (const u of Object.values(store.data.users)) upgradeUser(u);
   const allow = limiter();
+  const locks = new Map();
   const { route, match } = router();
   const hub = createHub();
   const photos = createPhotoStore(photoDir);
@@ -79,6 +83,16 @@ export function createApp(store, opts = {}) {
     },
     endSessions(userId, except = null) {
       for (const [t, s] of Object.entries(store.data.sessions)) if (s.userId === userId && t !== except) delete store.data.sessions[t];
+    },
+    // One request at a time per person for flows that read, wait (e.g. for Claude) and then
+    // write, so a pass landing mid-answer cannot have its question overwritten.
+    serial(userId, fn) {
+      const prev = locks.get(userId) || Promise.resolve();
+      const run = prev.then(fn, fn);
+      const done = run.catch(() => {});
+      locks.set(userId, done);
+      done.then(() => locks.get(userId) === done && locks.delete(userId));
+      return run;
     },
     meView(user) {
       return {
@@ -106,7 +120,7 @@ export function createApp(store, opts = {}) {
       hub.publish(user.id, 'notification', n);
       const wants = settingsOf(user).email[type];
       if (wants && hub.count(user.id) === 0) {
-        mailer.send({ to: user.email, subject: `ziDate: ${text}`, text: `${text}\n\n${baseUrl}/${link || ''}\n\nYou can change which emails you get under You > Settings.` });
+        mailer.send({ to: user.email, subject: `Pishi: ${text}`, text: `${text}\n\n${baseUrl}/${link || ''}\n\nYou can change which emails you get under You > Settings.` });
       }
       return n;
     },
@@ -170,9 +184,11 @@ export function createApp(store, opts = {}) {
       if (user?.suspended) user = null;
       if (r.auth && !user) throw new HttpError(401, 'Please sign in.');
       if (r.admin && !isAdmin(user)) throw new HttpError(403, 'Only for moderators.');
+      if (user && url.pathname === '/api/me') noteActive(store, user);
       const body = mutating ? await readBody(req, r.bodyLimit) : {};
       const out = await r.handler({ req, res, user, token, params, query: url.searchParams, body: body && typeof body === 'object' ? body : {} });
-      store.save();
+      // Writing the whole store is not free: only after changes, or reads that change state.
+      if (mutating || r.saves) store.save();
       if (out?.handled) return; // the route wrote its own response (streams, files)
       send(res, out.status || 200, out.body, out.headers);
     } catch (err) {

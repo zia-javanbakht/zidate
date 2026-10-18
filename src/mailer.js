@@ -1,9 +1,9 @@
 // Outgoing email. Every message is kept in an outbox (memory, plus a folder when configured),
-// and optionally POSTed as JSON to ZIDATE_MAIL_WEBHOOK so any email API or relay can deliver it.
+// and optionally POSTed as JSON to PISHI_MAIL_WEBHOOK so any email API or relay can deliver it.
 import fs from 'node:fs';
 import path from 'node:path';
 
-export function createMailer({ dir = null, webhook = null, from = 'ziDate <hello@zidate.local>' } = {}) {
+export function createMailer({ dir = null, webhook = null, from = 'Pishi <hello@pishi.local>' } = {}) {
   const sent = [];
   return {
     sent,

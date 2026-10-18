@@ -98,7 +98,7 @@ test('export gives you all your data as a download', async () => {
   assert.match(res.headers.get('content-disposition'), /attachment/);
   const data = await res.json();
   assert.equal(data.account.email, 'exp@x.co');
-  assert.ok(data.hiddenProfile.traits.length === 8);
+  assert.ok(data.hiddenProfile.traits.length === 13);
   assert.ok(data.conversationWithMatchmaker.length > 5);
 });
 
@@ -253,7 +253,19 @@ test('report someone straight from a suggestion', async () => {
   await onboard(c);
   const p = (await c.get('/api/week')).data.picks[0];
   assert.equal((await c.post(`/api/week/${p.id}/report`, { reason: 'Fake' })).status, 200);
-  assert.equal((await c.get('/api/week')).data.picks.find((x) => x.id === p.id).decision, 'pass');
+  // Gone from the week straight away, and they cannot be liked any more.
+  assert.equal((await c.get('/api/week')).data.picks.find((x) => x.id === p.id), undefined);
+  assert.equal((await c.post(`/api/week/${p.id}`, { decision: 'like' })).status, 404);
+});
+
+test('someone suspended mid-week drops out of the picks', async () => {
+  const c = client(srv.base);
+  await onboard(c);
+  const p = (await c.get('/api/week')).data.picks[0];
+  srv.store.data.users[p.id].suspended = true;
+  assert.equal((await c.get('/api/week')).data.picks.find((x) => x.id === p.id), undefined);
+  assert.equal((await c.post(`/api/week/${p.id}`, { decision: 'like' })).status, 404);
+  delete srv.store.data.users[p.id].suspended;
 });
 
 test('an empty week offers to widen the age range', async () => {
@@ -318,4 +330,94 @@ test('each person picks the day their two arrive', async () => {
   const next = new Date(after.next);
   assert.equal(new Date(next.getTime() + 9 * 3600e3).getUTCDay(), day);
   assert.equal(new Date(next.getTime() + 9 * 3600e3).getUTCHours(), 0);
+});
+
+test('facts: set, validate, hide and show on the shared profile', async () => {
+  const c = client(srv.base);
+  const { me } = await onboard(c, { email: 'facts@x.co' });
+  assert.equal((await c.put('/api/profile/facts', { facts: { star: 'Leo' } })).status, 400);
+  assert.equal((await c.put('/api/profile/facts', { facts: { kids: 'Maybe one day' } })).status, 400);
+  assert.equal((await c.put('/api/profile/facts', { facts: { work: 'DM me @nurse_jo' } })).status, 400);
+  const r = await c.put('/api/profile/facts', { facts: { work: 'Nurse', languages: 'English, Farsi', kids: 'wants kids' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.facts.kids.value, 'Wants kids');
+  let preview = (await c.get('/api/profile')).data.preview;
+  assert.deepEqual(preview.facts.map((f) => f.key), ['work', 'languages', 'kids']);
+  await c.patch('/api/profile/facts/work', { status: 'hidden' });
+  await c.put('/api/profile/facts', { facts: { languages: '' } });
+  preview = (await c.get('/api/profile')).data.preview;
+  assert.deepEqual(preview.facts.map((f) => f.key), ['kids']);
+  assert.ok(srv.store.data.users[me.id].shared.facts.work, 'hidden facts are kept');
+});
+
+test('limits learned from passes can be lifted from the hidden profile', async () => {
+  const c = client(srv.base);
+  const { me } = await onboard(c, { email: 'limits@x.co' });
+  Object.assign(srv.store.data.users[me.id].hidden.limits, { localOnly: true, ageMax: 39 });
+  let hidden = (await c.get('/api/profile')).data.hidden;
+  assert.deepEqual(hidden.limits.map((l) => l.key), ['localOnly', 'age']);
+  assert.equal((await c.del('/api/profile/limits/nope')).status, 404);
+  await c.del('/api/profile/limits/age');
+  hidden = (await c.get('/api/profile')).data.hidden;
+  assert.deepEqual(hidden.limits.map((l) => l.key), ['localOnly']);
+});
+
+test('matching signals stay on the server: never in app responses, only in the export', async () => {
+  const c = client(srv.base);
+  const { me } = await onboard(c, { email: `sig${Math.random()}@x.co` });
+  const sig = srv.store.data.signals[me.id];
+  assert.ok(sig && sig.chat.answers > 0, 'answers were recorded');
+  sig.observations.push({ text: 'MARKER-only-for-matching', at: new Date().toISOString() });
+  for (const url of ['/api/me', '/api/profile', '/api/chat', '/api/week', '/api/matches']) {
+    const r = await c.get(url);
+    assert.ok(!JSON.stringify(r.data).includes('MARKER-only-for-matching'), `${url} leaks signals`);
+    assert.ok(!JSON.stringify(r.data).includes('activeHours'), `${url} leaks signals`);
+  }
+  const res = await c.get('/api/me/export');
+  assert.deepEqual(res.data.matchingSignals.summary.observations, ['MARKER-only-for-matching']);
+  assert.ok(res.data.matchingSignals.raw.decisions, 'the raw record is included too');
+  await c.del('/api/me');
+  assert.equal(srv.store.data.signals[me.id], undefined, 'deleted with the account');
+});
+
+test('the profile guide comes with the profile, and "no dealbreakers" ticks that step', async () => {
+  const c = client(srv.base);
+  await onboard(c, { email: `guide${Math.random()}@x.co`, answers: { ...ANSWERS, q_dealbreakers: 'Skip' } });
+  let { guide } = (await c.get('/api/profile')).data;
+  assert.ok(guide.shared.steps.length && guide.hidden.steps.length);
+  assert.equal(guide.next.id, 'photo');
+  const step = (g) => g.hidden.steps.find((s) => s.id === 'dealbreakers');
+  if (!step(guide).done) {
+    guide = (await c.post('/api/profile/dealbreakers/none')).data.guide;
+    assert.equal(step(guide).done, true);
+  }
+});
+
+test('per-person requests that wait on the matchmaker run one at a time', async () => {
+  const order = [];
+  const slow = (name, ms) => srv.ctx.serial('u_lock', async () => {
+    order.push(`${name}:start`);
+    await new Promise((r) => setTimeout(r, ms));
+    order.push(`${name}:end`);
+  });
+  await Promise.all([slow('answer', 30), slow('pass', 1)]);
+  assert.deepEqual(order, ['answer:start', 'answer:end', 'pass:start', 'pass:end']);
+  // A failure does not jam the queue.
+  await assert.rejects(srv.ctx.serial('u_lock', async () => { throw new Error('boom'); }));
+  assert.equal(await srv.ctx.serial('u_lock', async () => 'ok'), 'ok');
+});
+
+test('plain reads do not rewrite the store', async () => {
+  const c = client(srv.base);
+  await onboard(c);
+  let saves = 0;
+  const orig = srv.store.save.bind(srv.store);
+  srv.store.save = () => { saves++; orig(); };
+  await c.get('/api/profile');
+  await c.get('/api/notifications');
+  await c.get('/api/matches');
+  assert.equal(saves, 0);
+  await c.get('/api/week');
+  assert.ok(saves > 0, 'a read that creates the week still saves');
+  srv.store.save = orig;
 });

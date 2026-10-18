@@ -44,6 +44,7 @@ export function welcome() {
 
   render(h('section', { class: 'welcome' },
     h('div', { class: 'stack' },
+      h('img', { class: 'logo', src: '/logo.svg', alt: 'Pishi', width: 112, height: 112 }),
       h('h1', {}, 'Two people a week.', h('br'), h('span', { class: 'muted' }, 'Chosen through conversation.')),
       h('p', { class: 'lede' }, 'No swiping. Talk with your matchmaker, decide what others see, and meet two people each week.')),
     h('ol', { class: 'how' },
@@ -51,7 +52,7 @@ export function welcome() {
       h('li', {}, 'You approve every line on your public profile. The rest stays private and is only used for matching.'),
       h('li', {}, 'Every Monday, two suggestions. Like, pass, and tell me why.')),
     form,
-    h('p', { class: 'small muted' }, h('a', { href: '#/about' }, 'How ziDate works and what it keeps private'))));
+    h('p', { class: 'small muted' }, h('a', { href: '#/about' }, 'How Pishi works and what it keeps private'))));
 }
 
 export function forgot() {
@@ -125,12 +126,14 @@ export function about() {
   const p = (t) => h('p', {}, t);
   render(h('article', { class: 'stack prose' },
     h('a', { class: 'back', href: state.me ? '#/settings' : '#/welcome' }, '← Back'),
-    h('h1', {}, 'How ziDate works'),
+    h('h1', {}, 'How Pishi works'),
+    p('Pishi means cat in Farsi. Like a cat, it is picky: two people a week, no more.'),
     h('h2', {}, 'A conversation, not a form'),
     p('Your matchmaker asks one question at a time. From your answers it builds two profiles. You can skip anything except the basics: age, gender, who you want to meet, and city.'),
     h('h2', {}, 'Two profiles'),
     p('The shared profile is what your matches see. Your matchmaker only suggests lines for it; nothing appears until you approve it, and you can write your own.'),
     p('The hidden profile is how I choose people for you: personality, values, dealbreakers and what you want in a partner. Only you can see it, under You, and you can correct anything that is wrong.'),
+    p('I also learn from what you do: who you like and pass on, how conversations with matches go, and when you are usually around. These signals are only used to choose people for you. They are not shown in the app, and they are included when you download your data.'),
     h('h2', {}, 'Two people a week'),
     p('Every Monday you get two suggestions, people in your city first. Like or pass, and tell me why: it makes the next pair better. When you both like each other, you can talk.'),
     h('h2', {}, 'Privacy and safety'),

@@ -4,7 +4,7 @@
   --text: #1c1b19;
   --muted: #6e6a63;
   --line: #e4e0d8;
-  --accent: #a5533a;
+  --accent: #b23a56;
   --danger: #b3261e;
   --ok: #2e7d4f;
   --accent-ink: #ffffff;
@@ -22,7 +22,7 @@
     --text: #ece8e1;
     --muted: #9c978e;
     --line: #2f2d2a;
-    --accent: #d98463;
+    --accent: #e8788b;
     --accent-ink: #151413;
     --danger: #f2867e;
     --ok: #6fc28f;
@@ -38,7 +38,7 @@
   --text: #ece8e1;
   --muted: #9c978e;
   --line: #2f2d2a;
-  --accent: #d98463;
+  --accent: #e8788b;
   --accent-ink: #151413;
   --danger: #f2867e;
   --ok: #6fc28f;
@@ -77,8 +77,8 @@ p { margin: 0; }
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
 }
-.mark { font-family: var(--serif); font-size: 1.35rem; text-decoration: none; }
-.mark span { color: var(--accent); }
+.mark { font-family: var(--serif); font-size: 1.35rem; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
+.mark img { width: 30px; height: 30px; }
 nav { display: flex; gap: 4px; }
 nav a {
   position: relative; text-decoration: none; color: var(--muted);
@@ -117,6 +117,7 @@ label { display: block; font-size: .875rem; color: var(--muted); margin-bottom: 
 
 /* Welcome */
 .welcome { min-height: 80dvh; display: flex; flex-direction: column; justify-content: center; gap: 28px; }
+.welcome .logo { width: 112px; height: 112px; }
 .welcome .lede { font-size: 1.15rem; color: var(--muted); max-width: 30ch; }
 .how { display: grid; gap: 10px; padding: 0; margin: 0; list-style: none; counter-reset: s; }
 .how li { counter-increment: s; display: flex; gap: 12px; color: var(--muted); }
@@ -155,6 +156,8 @@ label { display: block; font-size: .875rem; color: var(--muted); margin-bottom: 
 .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; padding: 0; list-style: none; }
 .tags li { border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: .85rem; color: var(--muted); }
 .tags li button { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0 0 0 4px; }
+.facts { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 14px 0 0; padding: 0; list-style: none; font-size: .9rem; }
+.facts li span { color: var(--muted); margin-right: 4px; }
 .qa { margin-top: 16px; }
 .qa dt { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .qa dd { margin: 2px 0 12px; }
@@ -297,3 +300,13 @@ input[type=number] { width: 100%; padding: 11px 12px; border: 1px solid var(--li
 .top nav { margin-left: auto; }
 .msg.them { background: var(--surface); border: 1px solid var(--line); padding: 9px 14px; border-radius: 18px 18px 18px 4px; }
 .report-link { margin-top: 14px; }
+
+/* --- profile guide --- */
+.guide .guide-bar { display: grid; gap: 6px; }
+.guide .label { display: flex; justify-content: space-between; font-size: .9rem; }
+.guide .meter { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.guide .meter i { display: block; height: 100%; background: var(--accent); border-radius: inherit; transition: width .3s ease; }
+.guide .next { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.guide .next p { margin: 0; }
+.guide .todo { margin: 0; padding-left: 18px; color: var(--muted); font-size: .9rem; }
+.guide .todo .link { text-align: left; }

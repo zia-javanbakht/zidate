@@ -45,7 +45,8 @@ test('Claude results are applied through the same profile rules', async () => {
   assert.equal(msg.text.startsWith('Sounds like a lovely Sunday'), true);
   assert.ok(u.hidden.traits.social.value > 0.6);
   assert.equal(u.hidden.traits.bogus, undefined);
-  assert.deepEqual(u.shared.interests, ['hiking', 'cooking']);
+  assert.deepEqual(u.shared.suggestedInterests, ['hiking', 'cooking']);
+  assert.deepEqual(u.shared.interests, []);
   assert.equal(u.shared.items.length, 1);
   assert.equal(u.shared.items[0].status, 'suggested');
   assert.equal(u.shared.bioDraft, 'Hiker and cook.');

@@ -1,10 +1,11 @@
 // Both profiles: approving and writing shared lines, bio, interests, photos, dealbreakers,
 // and correcting the hidden profile.
-import { basicsDone, describeHidden, publicProfile, cleanText, hasContactInfo, settingsOf } from '../profile.js';
+import { basicsDone, describeHidden, publicProfile, cleanText, cleanFact, hasContactInfo, settingsOf } from '../profile.js';
 import { askNow } from '../agent/index.js';
-import { INTERESTS, TAGS } from '../traits.js';
+import { INTERESTS, TAGS, FACTS, FACT_KEYS } from '../traits.js';
 import { decodeUpload, mimeFor, MAX_PHOTOS } from '../photos.js';
 import { matchId, currentWeek } from '../matching.js';
+import { profileGuide } from '../guide.js';
 
 const NO_CONTACT = 'Keep contact details off your profile. You can share them once you match.';
 export const PROMPTS = [
@@ -12,18 +13,22 @@ export const PROMPTS = [
   'What makes me laugh', 'What matters most to me', "Something I'm proud of", 'How my friends describe me',
   'Where I want to be in five years', 'A tradition I want to keep', 'Something that changed my mind',
   'How I like to spend a free afternoon', 'The way to win me over', 'A small thing that makes my day',
+  'My idea of a great first date', 'Green flags I look for', 'What my home says about me', 'Something I keep just for me',
+  'A story that still makes me laugh',
 ];
 
-export default function profile({ store, route, HttpError, meView, photos }) {
+export default function profile({ store, route, HttpError, meView, photos, serial }) {
   route('GET', '/api/profile', async ({ user }) => ({
     body: {
       shared: user.shared,
       photos: (user.photos || []).map((p) => ({ id: p.id, url: `/api/photos/${p.id}` })),
       preview: publicProfile(user, { showPhotos: true }),
       hidden: describeHidden(user),
+      guide: profileGuide(user),
       prompts: PROMPTS,
       interests: INTERESTS,
       tags: TAGS,
+      facts: FACTS,
       me: meView(user),
     },
   }));
@@ -77,7 +82,7 @@ export default function profile({ store, route, HttpError, meView, photos }) {
   });
 
   // "That's not me": forget most of what we inferred and ask directly.
-  route('POST', '/api/profile/traits/:key/recheck', async ({ user, params }) => {
+  route('POST', '/api/profile/traits/:key/recheck', async ({ user, params }) => serial(user.id, async () => {
     const t = user.hidden.traits[params.key];
     if (!t) throw new HttpError(404, 'Not found.');
     user.hidden.traits[params.key] = { value: 0.5, confidence: t.confidence * 0.3 };
@@ -86,6 +91,52 @@ export default function profile({ store, route, HttpError, meView, photos }) {
     convo.events.unshift({ type: 'recheck', trait: params.key });
     if (basicsDone(user)) askNow(user, convo);
     return { body: { ok: true } };
+  }));
+
+  // Facts (work, languages, kids…): set several at once. An empty value removes one.
+  // Anything the person sets themselves is shown straight away.
+  route('PUT', '/api/profile/facts', async ({ user, body }) => {
+    const input = body.facts && typeof body.facts === 'object' ? body.facts : {};
+    user.shared.facts ||= {};
+    for (const [key, raw] of Object.entries(input)) {
+      if (!FACTS[key]) throw new HttpError(400, 'Unknown fact.');
+      if (!cleanText(raw, 60)) {
+        delete user.shared.facts[key];
+        continue;
+      }
+      if (!FACTS[key].options && hasContactInfo(raw)) throw new HttpError(400, NO_CONTACT);
+      const value = cleanFact(key, raw);
+      if (!value) throw new HttpError(400, `Pick one of the options for ${FACTS[key].label.toLowerCase()}.`);
+      user.shared.facts[key] = { value, status: 'approved' };
+    }
+    return { body: { facts: user.shared.facts } };
+  });
+
+  // Show or hide one fact, e.g. a suggestion from the matchmaker.
+  route('PATCH', '/api/profile/facts/:key', async ({ user, params, body }) => {
+    const fact = user.shared.facts?.[params.key];
+    if (!fact) throw new HttpError(404, 'Not found.');
+    if (!['approved', 'hidden', 'suggested'].includes(body.status)) throw new HttpError(400, 'Unknown status.');
+    fact.status = body.status;
+    return { body: { fact } };
+  });
+
+  route('POST', '/api/profile/facts/approve-all', async ({ user }) => {
+    let n = 0;
+    for (const k of FACT_KEYS) {
+      const f = user.shared.facts?.[k];
+      if (f?.status === 'suggested') (f.status = 'approved'), n++;
+    }
+    return { body: { approved: n } };
+  });
+
+  // Limits learned from passes live in the hidden profile, but the person can lift them.
+  route('DELETE', '/api/profile/limits/:key', async ({ user, params }) => {
+    const l = (user.hidden.limits ||= {});
+    const keys = { localOnly: ['localOnly'], age: ['ageMin', 'ageMax'], prefersDetail: ['prefersDetail'] }[params.key];
+    if (!keys) throw new HttpError(404, 'Not found.');
+    for (const k of keys) delete l[k];
+    return { body: { limits: describeHidden(user).limits } };
   });
 
   route('POST', '/api/profile/interests', async ({ user, body }) => {
@@ -95,7 +146,17 @@ export default function profile({ store, route, HttpError, meView, photos }) {
       if (user.shared.interests.length >= 12) throw new HttpError(400, 'Twelve is the limit. Remove one first.');
       user.shared.interests.push(name);
     }
+    user.shared.suggestedInterests = (user.shared.suggestedInterests || []).filter((i) => i !== name);
     return { body: { interests: user.shared.interests } };
+  });
+
+  // Interests the matchmaker heard: add them all, or let them go.
+  route('POST', '/api/profile/interests/suggested', async ({ user, body }) => {
+    const s = user.shared;
+    const take = body.action === 'add' ? (s.suggestedInterests || []).filter((i) => !s.interests.includes(i)) : [];
+    s.interests = [...s.interests, ...take].slice(0, 12);
+    s.suggestedInterests = [];
+    return { body: { interests: s.interests } };
   });
 
   route('DELETE', '/api/profile/interests/:name', async ({ user, params }) => {
@@ -109,6 +170,12 @@ export default function profile({ store, route, HttpError, meView, photos }) {
     if (!TAGS.includes(tag)) throw new HttpError(400, 'Pick one from the list.');
     if (!user.hidden.dealbreakers.includes(tag)) user.hidden.dealbreakers.push(tag);
     return { body: { dealbreakers: user.hidden.dealbreakers } };
+  });
+
+  // "I have none" also counts as having thought about it.
+  route('POST', '/api/profile/dealbreakers/none', async ({ user }) => {
+    user.guide = { ...user.guide, noDealbreakers: true };
+    return { body: { guide: profileGuide(user) } };
   });
 
   route('DELETE', '/api/profile/dealbreakers/:tag', async ({ user, params }) => {

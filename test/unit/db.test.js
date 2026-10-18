@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../../src/db.js';
 
-const tmp = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'zidate-')), 'db.json');
+const tmp = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pishi-')), 'db.json');
 
 test('data survives a restart', async () => {
   const file = tmp();

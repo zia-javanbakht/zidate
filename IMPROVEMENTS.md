@@ -82,3 +82,31 @@ Asked for: complete the missing components and features, with up to 50 suggestio
 | 69 | Bug | Pausing mid-week still showed the week's picks. Paused now always wins. | Found by the new browser test |
 | 70 | Bug | Dialog dropdowns started empty, so "Add a line" always failed. Also: match messages now have their own bubble, and the forgot-password page keeps the email you typed. | Found by the new browser test; screenshots |
 | 71 | Feature | Pick the day your weekly two arrive (Settings), at midnight in your own time zone (taken from the browser at sign-up). Changing the day keeps the current pair, so a week is never repeated or skipped. | Unit tests for day/time-zone weeks and day changes; API test; screenshots |
+| 72 | Matching | Passing now opens a short conversation about why: the main reason as quick replies (only the ones that fit), then a follow-up for that reason. Answers steer partner preferences, set age or distance limits, or favour fuller profiles. The other person's hidden profile is never shown, only neutral labels. | Unit, API and browser tests |
+| 73 | Profile | Five more hidden traits (affection, disagreements, tidiness, independence, humour) with deeper questions; how someone feels cared for and how fast they like things to move; marriage and vegan tags. Readiness still uses the first eight traits, so nobody waits longer. | Unit tests |
+| 74 | Profile | Shared-profile facts (work, education, languages, height, looking for, kids, drinking, smoking, diet, pets), suggested from the conversation and shown only once approved; five more prompts. | Unit and API tests; screenshots |
+
+## Rebrand (75)
+
+| # | Area | What changed | Verified by |
+|---|---|---|---|
+| 75 | Brand | ziDate is now Pishi ("cat" in Farsi): name everywhere, a flat vector cat logo (logo.svg) in the header, welcome page, favicon and app icons, a rose accent colour matching it, and `PISHI_*` environment variables (were `ZIDATE_*`). | Full suite; screenshots |
+
+## Round 3: guided profiles, matching signals, five review cycles (76–87)
+
+Asked for: guide people to complete both profiles; keep a much more detailed record per person that is not shown to them, to improve matching; then five cycles of critical analysis, suggestions and fixes.
+
+| # | Area | What changed | Verified by |
+|---|---|---|---|
+| 76 | Profile | "Finish your profile" card: progress for the shared and hidden profile, the next step with a button straight to it, and two more to-dos. "I have none" settles dealbreakers. | Unit and API tests; screenshots |
+| 77 | Matchmaker | Once matching has started, every six answers the matchmaker points at the most useful gap on the profiles (photo, bio, lines, suggestions waiting, facts, interests, dealbreakers), never the same one twice in a row. | Unit test |
+| 78 | Matching | Matching signals, kept per person apart from the user record and never shown in the app: answer pace and length, skips, likes and passes by what the other person showed, revealed trait preferences, who answers their matches, active hours, how often people like them, and Claude's private observations. Included in the data export, deleted with the account, disclosed on the About page. | Unit and API tests (no app response contains them) |
+| 79 | Matching | Ranking adds a small behaviour-based adjustment from those signals: revealed preferences, like chance, responsiveness, reports, spreading attention, overlapping hours. | Unit tests |
+| 80 | Cycle 1, privacy | The "which part of their life" follow-up listed the traits where the other person's hidden profile differed most, so it hinted at their hidden stance. It now offers a fixed list. | Unit test |
+| 81 | Cycle 1, safety | Someone paused, suspended or blocked mid-week stayed in the picks and could still be liked into a match. They now drop out at once. | API tests |
+| 82 | Cycle 2, signals | One person reporting someone three times counted three times, and dismissed reports kept counting. Reports now count once per reporter and only while they stand. | Unit test |
+| 83 | Cycle 2, signals | The export now carries the raw signals record, and the matchmaker's private observations are fed back to it as context instead of only being collected. | API and unit tests |
+| 84 | Cycle 3, matching | Every like raised the learned partner preference until it outweighed everything the person said. Likes now stop at a modest confidence. Widening a short week tops it up instead of rerolling it, is refused on a full week, and also lifts the city and age limits learned from passes. | Unit tests |
+| 85 | Cycle 4, robustness | A pass landing while Claude was answering could overwrite the "why did you pass" question. Chat, decisions, widening and "Not me" now run one at a time per person. The store is written only after changes, suggested-before is an index instead of a scan, and sessions are pruned hourly. | API tests |
+| 86 | Cycle 5, profile | Interests heard in the conversation went public without approval. They are now suggestions ("You mentioned hiking, films. Show them?"), still used for matching but never named to others until approved. | Unit and API tests |
+| 87 | Cycle 5, matchmaker | Nudges could stall on a step only the interview covers, and an automatic contradiction check opened with "You said I got something wrong" when the person had said no such thing. Both fixed. | Unit tests |

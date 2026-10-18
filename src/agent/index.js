@@ -5,10 +5,11 @@ import { mockEngine, draftBio } from './mock.js';
 import { claudeEngine } from './claude.js';
 import { applyUpdate, completeness, isReady, basicsDone, cleanText } from '../profile.js';
 import { now } from '../clock.js';
+import { profileGuide } from '../guide.js';
 import { normalizeCity } from '../cities.js';
 
 export function pickEngine() {
-  if (process.env.ZIDATE_AGENT === 'offline') return mockEngine;
+  if (process.env.PISHI_AGENT === 'offline') return mockEngine;
   return process.env.ANTHROPIC_API_KEY ? claudeEngine : mockEngine;
 }
 
@@ -16,7 +17,7 @@ export function newConversation() {
   return { messages: [], asked: [], pending: null, events: [], flags: {} };
 }
 
-const SKIP_RE = /^(skip|skip (it|this|this one)|pass|next( question)?|rather not( say)?|i'?d rather not( say)?|prefer not to say|no comment)[.!]?$/i;
+export const SKIP_RE = /^(skip|skip (it|this|this one)|pass|next( question)?|rather not( say)?|i'?d rather not( say)?|prefer not to say|no comment)[.!]?$/i;
 const NOT_A_CITY = /^(skip|pass|next|no|nope|none|idk|why|what|nowhere|secret|private|rather not( say)?|not telling|hi|hello|hey|yes|ok|okay)$/i;
 
 function parseBasic(key, text) {
@@ -113,7 +114,9 @@ export function opening(user, convo) {
 const READY_LINE = 'I know enough to introduce you to your first two people. We can keep talking whenever you like: the more I know, the better the picks.';
 
 // Handle one message from the person. Returns the agent's reply message.
-export async function respond(user, convo, rawText, engine = pickEngine()) {
+// signals: optional { observations, save(list) } for the matchmaker's private observations,
+// which are kept with the matching signals, never on the person's profiles.
+export async function respond(user, convo, rawText, engine = pickEngine(), signals = null) {
   const text = cleanText(rawText, 1200);
   if (!text) throw Object.assign(new Error('Say something first.'), { status: 400 });
   convo.messages.push({ role: 'user', text, at: now().toISOString() });
@@ -123,7 +126,7 @@ export async function respond(user, convo, rawText, engine = pickEngine()) {
     const value = parseBasic(pending.key, text);
     if (value === 'minor') {
       user.blocked = 'under18';
-      return say(convo, 'ziDate is only for adults, so I cannot continue. Take care.', null);
+      return say(convo, 'Pishi is only for adults, so I cannot continue. Take care.', null);
     }
     if (value == null) {
       const q = { ...BASICS.find((b) => b.key === pending.key), kind: 'basic', mode: 'self' };
@@ -147,17 +150,21 @@ export async function respond(user, convo, rawText, engine = pickEngine()) {
   const choice = pending?.choices?.find((c) => typeof c === 'object' && c.label.toLowerCase() === text.toLowerCase());
   if (choice) {
     applyUpdate(user, {
-      traitUpdates: Object.entries(choice.set).map(([trait, value]) => ({ trait, value, confidence: 0.55 })),
+      traitUpdates: Object.entries(choice.set || {}).map(([trait, value]) => ({ trait, value, confidence: 0.55 })),
+      preferenceUpdates: choice.prefer || [],
       tags: choice.tags || [],
+      aspects: choice.aspects,
+      facts: choice.facts,
     });
     Object.assign(user.basics, choice.basics || {});
+    applyPassChoice(user, convo, pending, choice);
     choiceApplied = true;
   }
 
   const next = nextQuestion(user, convo);
   let result;
   try {
-    result = await engine.turn({ user, convo, pending, answer: text, choiceApplied, choice, next });
+    result = await engine.turn({ user, convo, pending, answer: text, choiceApplied, choice, next, observations: signals?.observations || [] });
   } catch (err) {
     if (engine === mockEngine) throw err;
     console.warn(`[agent] ${engine.name} failed, using offline engine: ${err.message}`);
@@ -170,11 +177,13 @@ export async function respond(user, convo, rawText, engine = pickEngine()) {
     if (!before || convo.flags.rechecked[t.trait]) continue;
     if (before.confidence >= 0.45 && t.confidence >= 0.3 && Math.abs(t.value - before.value) > 0.55) {
       convo.flags.rechecked[t.trait] = true;
-      queueEvent(convo, { type: 'recheck', trait: t.trait });
+      queueEvent(convo, { type: 'recheck', trait: t.trait, auto: true });
     }
   }
-  applyUpdate(user, result.update);
-  if (!result.update.bio) {
+  const { observations, ...update } = result.update;
+  if (observations?.length) signals?.save(observations);
+  applyUpdate(user, update);
+  if (!update.bio) {
     const bio = draftBio(user);
     if (bio) user.shared.bioDraft = bio;
   }
@@ -185,8 +194,33 @@ export async function respond(user, convo, rawText, engine = pickEngine()) {
     // A milestone gets its own card in the chat, not a sentence buried in a reply.
     convo.flags.readyAnnounced = true;
     convo.messages.push({ role: 'agent', notice: 'ready', text: READY_LINE, at: now().toISOString() });
-  }
+  } else if (wasReady) guideNudge(user, convo);
   return say(convo, reply, next);
+}
+
+// Once matching has started, point now and then at the most useful thing left to do
+// on the profiles. Never more than once every six answers, never the same step twice in a row.
+const NUDGE_EVERY = 6;
+const NUDGES = {
+  photo: 'People are far more likely to say yes when they can see you. Add a photo when you have a moment.',
+  bio: 'You do not have a bio yet. Two sentences are enough, and I have drafted one you can use.',
+  lines: 'Your shared profile is a bit quiet. A few lines in your own words give your matches something to reply to.',
+  review: 'I have suggested some lines for your shared profile. They only appear once you approve them.',
+  facts: 'A few plain facts, like your work or whether you want kids, save your matches a lot of guessing.',
+  interests: 'Add a few interests so I can tell your matches what you have in common.',
+  dealbreakers: 'Is there anything you could never accept in a partner? You can set dealbreakers on your profile.',
+};
+
+function guideNudge(user, convo) {
+  convo.flags.sinceNudge = (convo.flags.sinceNudge || 0) + 1;
+  if (convo.flags.sinceNudge < NUDGE_EVERY) return;
+  // The first open step worth a nudge. Steps done by talking are left to the interview itself.
+  const g = profileGuide(user);
+  const step = [...g.shared.steps, ...g.hidden.steps].find((s) => !s.done && NUDGES[s.id] && s.action.href !== '#/talk' && s.id !== convo.flags.lastNudge);
+  if (!step) return;
+  convo.flags.sinceNudge = 0;
+  convo.flags.lastNudge = step.id;
+  convo.messages.push({ role: 'agent', notice: 'guide', text: NUDGES[step.id], link: step.action.href, label: step.action.label, at: now().toISOString() });
 }
 
 // After a day or more away, greet the person and repeat where we were.
@@ -207,6 +241,29 @@ export function askNow(user, convo) {
   if (convo.pending?.id) convo.asked = convo.asked.filter((id) => id !== convo.pending.id);
   const q = nextQuestion(user, convo);
   return say(convo, q.text, q);
+}
+
+// A quick reply to one of the "why did you pass" questions: remember the reason,
+// tighten the search if asked, and line up the follow-up question.
+function applyPassChoice(user, convo, pending, choice) {
+  const cid = pending.id.replace(/^fb\w?_/, '');
+  user.hidden.passReasons ||= [];
+  user.hidden.limits ||= {};
+  if (choice.reason) {
+    user.hidden.passReasons.push({ candidateId: cid, reason: choice.reason, at: now().toISOString() });
+    user.hidden.passReasons = user.hidden.passReasons.slice(-30);
+  }
+  if (choice.detail) {
+    const last = user.hidden.passReasons.findLast((r) => r.candidateId === cid);
+    if (last) last.detail = choice.detail;
+  }
+  if (choice.limits) {
+    const l = user.hidden.limits;
+    Object.assign(l, choice.limits);
+    // Never leave an impossible age window behind.
+    if (l.ageMin != null && l.ageMax != null && l.ageMin > l.ageMax) delete l[choice.limits.ageMin != null ? 'ageMax' : 'ageMin'];
+  }
+  if (choice.then) convo.events.unshift(choice.then);
 }
 
 export function queueEvent(convo, event) {

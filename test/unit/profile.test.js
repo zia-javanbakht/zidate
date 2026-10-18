@@ -34,6 +34,7 @@ test('agent suggestions never go public until approved', () => {
   const pub = publicProfile(u);
   assert.equal(pub.items.length, 0);
   assert.equal(pub.bio, '');
+  assert.deepEqual(pub.interests, []);
   u.shared.items[0].status = 'approved';
   assert.equal(publicProfile(u).items.length, 1);
 });

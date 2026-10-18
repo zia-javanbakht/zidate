@@ -35,7 +35,8 @@ test('the interview fills both profiles and unlocks matching', async () => {
   const { data } = await c.get('/api/profile');
   assert.ok(data.shared.items.length >= 2, 'agent suggested shared lines');
   assert.ok(data.shared.items.every((i) => i.status === 'suggested'));
-  assert.ok(data.shared.interests.length >= 2);
+  assert.ok(data.shared.suggestedInterests.length >= 2, 'interests are suggested');
+  assert.equal(data.shared.interests.length, 0, 'and not public until approved');
   assert.ok(data.hidden.traits.filter((t) => t.confidence > 0.2).length >= 5);
   assert.ok(data.hidden.tags.includes('wants-kids') || data.hidden.tags.includes('non-smoker'));
   assert.equal(data.preview.items.length, 0, 'nothing public until approved');
@@ -86,13 +87,17 @@ test('deciding: like/pass once, pass triggers a follow-up question that updates 
   assert.equal(r.status, 200);
   assert.equal((await c.post(`/api/week/${b.id}`, { decision: 'like' })).status, 409);
 
-  const before = (await c.get('/api/profile')).data;
-  const reply = await c.post('/api/chat', { text: 'Tell me more' });
-  assert.match(reply.data.message.text, new RegExp(`passed on ${b.name}`));
+  // The matchmaker asks why straight away, with quick replies for the usual reasons.
+  const chat = (await c.get('/api/chat')).data.messages;
+  const ask = chat.at(-1);
+  assert.match(ask.text, new RegExp(`passed on ${b.name}`));
+  assert.ok(ask.choices.includes('No spark') && ask.choices.includes('Something else'));
+  const other = await c.post('/api/chat', { text: 'Something else' });
+  assert.match(other.data.message.text, new RegExp(`didn't feel right about ${b.name}`));
   await c.post('/api/chat', { text: 'They seemed too quiet, I want someone who loves parties and going out.' });
   const userObj = srv.store.data.users[me.id];
   assert.ok(userObj.hidden.preference.social.value > 0.6, 'learned they want someone more social');
-  assert.ok(before);
+  assert.deepEqual(userObj.hidden.passReasons.map((r) => r.reason), ['other']);
 });
 
 test('mutual like creates a match and both sides can message', async () => {
