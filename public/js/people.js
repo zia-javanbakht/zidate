@@ -1,9 +1,63 @@
 // Other people: this week's two, matches, and conversations with a match.
 import { h, api, render, setMe, state, toast, progress, ask, live, ago, until, clock, main } from './core.js';
 
+// One photo at a time: swipe, tap the left or right edge, use the arrows or the
+// dots, or the arrow keys once the gallery has focus.
+export function gallery(photos, name) {
+  const track = h('div', { class: 'track' }, photos.map((src, i) => h('img', {
+    src, alt: i === 0 ? `Photo of ${name}` : `${name}, photo ${i + 1}`, loading: i === 0 ? null : 'lazy', draggable: 'false',
+  })));
+  const box = h('div', { class: 'gallery', role: 'region', 'aria-roledescription': 'carousel', 'aria-label': `Photos of ${name}` }, track);
+  if (photos.length < 2) return box;
+
+  let at = 0;
+  const smooth = () => (matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
+  const go = (i) => {
+    const to = Math.max(0, Math.min(photos.length - 1, i));
+    track.scrollTo({ left: to * track.clientWidth, behavior: smooth() });
+    show(to);
+  };
+  const prev = h('button', { class: 'nav prev', type: 'button', 'aria-label': 'Previous photo', onclick: () => go(at - 1) }, '‹');
+  const next = h('button', { class: 'nav next', type: 'button', 'aria-label': 'Next photo', onclick: () => go(at + 1) }, '›');
+  const count = h('span', { class: 'count', 'aria-live': 'polite' });
+  const dots = photos.map((_, i) => h('button', { type: 'button', 'aria-label': `Photo ${i + 1} of ${photos.length}`, onclick: () => go(i) }));
+  function show(i) {
+    at = i;
+    prev.disabled = i === 0;
+    next.disabled = i === photos.length - 1;
+    count.textContent = `${i + 1} / ${photos.length}`;
+    dots.forEach((d, j) => (j === i ? d.setAttribute('aria-current', 'true') : d.removeAttribute('aria-current')));
+  }
+  // Swiping moves the track itself; keep the arrows, dots and count in step with it.
+  let settle;
+  track.addEventListener('scroll', () => {
+    clearTimeout(settle);
+    settle = setTimeout(() => {
+      const i = Math.round(track.scrollLeft / (track.clientWidth || 1));
+      if (i !== at) show(i);
+    }, 60);
+  }, { passive: true });
+  track.addEventListener('click', (e) => {
+    const { left, width } = track.getBoundingClientRect();
+    const x = (e.clientX - left) / width;
+    if (x < 0.3) go(at - 1);
+    else if (x > 0.7) go(at + 1);
+  });
+  box.tabIndex = 0;
+  box.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') go(at - 1);
+    else if (e.key === 'ArrowRight') go(at + 1);
+    else return;
+    e.preventDefault();
+  });
+  box.append(prev, next, count, h('div', { class: 'dots' }, dots));
+  show(0);
+  return box;
+}
+
 export function personCard(p, { onDecide, onReport } = {}) {
   const card = h('article', { class: 'card person' },
-    p.photos?.length ? h('div', { class: 'gallery' }, p.photos.map((src, i) => h('img', { src, alt: i === 0 ? `Photo of ${p.name}` : `${p.name}, photo ${i + 1}`, loading: 'lazy' }))) : null,
+    p.photos?.length ? gallery(p.photos, p.name) : null,
     h('h2', {}, p.name),
     h('p', { class: 'meta' }, [p.age, p.city, p.demo ? 'demo profile' : null].filter(Boolean).join(' · ')),
     p.photosHidden ? h('p', { class: 'hint' }, `${p.name} shares photos after you match.`) : null,

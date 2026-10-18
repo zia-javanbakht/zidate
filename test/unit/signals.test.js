@@ -28,7 +28,13 @@ test('guide: new people start with the hidden profile; ready people with the sha
   const r = person(store);
   g = profileGuide(r);
   assert.equal(g.next.id, 'photo');
+  assert.equal(g.next.action.label, 'Add photos');
   r.photos = [{ id: 'p1' }];
+  g = profileGuide(r);
+  assert.equal(g.next.id, 'photo', 'one photo is not enough: the guide asks for three');
+  assert.match(g.next.label, /you have 1/);
+  assert.equal(g.next.action.label, 'Add 2 more');
+  r.photos.push({ id: 'p2' }, { id: 'p3' });
   r.shared.bio = 'Hello.';
   for (let i = 0; i < 3; i++) r.shared.items.push({ id: `i${i}`, text: 'x', status: 'approved' });
   r.shared.items.push({ id: 's', text: 'y', status: 'suggested' });
@@ -191,7 +197,7 @@ test('nudges skip a step they just nudged and reach the dealbreakers too', async
   const u = person(store);
   const convo = store.data.conversations[u.id];
   convo.flags.readyAnnounced = true;
-  u.photos = [{ id: 'p' }];
+  u.photos = [{ id: 'p1' }, { id: 'p2' }, { id: 'p3' }];
   u.shared.bio = 'Hi.';
   for (let i = 0; i < 3; i++) u.shared.items.push({ id: `i${i}`, text: 'x', status: 'approved' });
   u.shared.facts = { work: { value: 'Nurse', status: 'approved' }, kids: { value: 'Wants kids', status: 'approved' }, pets: { value: 'No pets', status: 'approved' } };
@@ -202,6 +208,21 @@ test('nudges skip a step they just nudged and reach the dealbreakers too', async
   await respond(u, convo, 'I like long walks.', mockEngine);
   const nudge = convo.messages.find((m) => m.notice === 'guide');
   assert.equal(nudge?.link, '#/profile/dealbreakers');
+});
+
+test('the photo nudge asks for three, and says so differently once there is one', async () => {
+  const store = new Store(null);
+  const u = person(store);
+  const convo = store.data.conversations[u.id];
+  convo.flags.readyAnnounced = true;
+  const { mockEngine } = await import('../../src/agent/mock.js');
+  opening(u, convo);
+  u.photos = [{ id: 'p' }];
+  convo.flags.sinceNudge = 5;
+  await respond(u, convo, 'I like long walks.', mockEngine);
+  const nudge = convo.messages.find((m) => m.notice === 'guide');
+  assert.equal(nudge?.link, '#/profile/photos');
+  assert.match(nudge.text, /Three/);
 });
 
 test('an automatic recheck does not claim the person said something was wrong', async () => {
