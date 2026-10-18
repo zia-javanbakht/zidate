@@ -127,10 +127,27 @@ test('observations from the engine go to the signals, never into the profiles', 
   const u = newUser(store, { name: 'O', email: 'o@x.co', password: null });
   const convo = store.data.conversations[u.id];
   opening(u, convo);
-  const engine = { name: 'fake', turn: async () => ({ reply: 'Thanks. Next?', update: { observations: ['Talks about her sister in every answer.'] } }) };
+  let seen = null;
+  const engine = { name: 'fake', turn: async (ctx) => { seen = ctx.observations; return { reply: 'Thanks. Next?', update: { observations: ['Talks about her sister in every answer.'] } }; } };
   await respond(u, convo, 'Woman', engine); // a basic: no engine call
   for (const a of ['Men', '31', 'London']) await respond(u, convo, a, engine);
-  await respond(u, convo, 'My sister and I run every Sunday.', engine, (obs) => noteObservations(store, u, obs));
+  const signals = () => ({ observations: signalsOf(store, u.id).observations.map((o) => o.text), save: (l) => noteObservations(store, u, l) });
+  await respond(u, convo, 'My sister and I run every Sunday.', engine, signals());
   assert.deepEqual(signalsOf(store, u.id).observations.map((o) => o.text), ['Talks about her sister in every answer.']);
+  // The next turn gets them back as private context for the matchmaker.
+  await respond(u, convo, 'Also my sister got married.', engine, signals());
+  assert.deepEqual(seen, ['Talks about her sister in every answer.']);
   assert.ok(!JSON.stringify(u).includes('sister in every answer'));
+});
+
+test('reports count once per reporter, and dismissed ones stop counting', () => {
+  const store = new Store(null);
+  const me = person(store);
+  const other = person(store, {}, { gender: 'man' });
+  const before = signalBoost(store, me, other);
+  for (let i = 0; i < 3; i++) store.data.reports.push({ by: 'u_angry', about: other.id, status: 'open' });
+  const once = signalBoost(store, me, other);
+  assert.ok(Math.abs(before - once - 0.05) < 1e-9, 'three reports from one person count as one');
+  for (const r of store.data.reports) r.status = 'dismissed';
+  assert.equal(signalBoost(store, me, other), before);
 });

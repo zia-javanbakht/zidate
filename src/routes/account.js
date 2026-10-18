@@ -200,7 +200,7 @@ export default function account(ctx) {
       sharedProfile: user.shared,
       hiddenProfile: { ...describeHidden(user), raw: user.hidden },
       // Kept only for matching and never shown in the app; included here because it is yours.
-      matchingSignals: summarizeSignals(signalsOf(store, user.id)),
+      matchingSignals: { summary: summarizeSignals(signalsOf(store, user.id)), raw: signalsOf(store, user.id) },
       photos: (user.photos || []).map((p) => p.id),
       conversationWithMatchmaker: store.data.conversations[user.id]?.messages || [],
       likes: mine('likes'),

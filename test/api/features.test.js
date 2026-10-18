@@ -374,7 +374,8 @@ test('matching signals stay on the server: never in app responses, only in the e
     assert.ok(!JSON.stringify(r.data).includes('activeHours'), `${url} leaks signals`);
   }
   const res = await c.get('/api/me/export');
-  assert.deepEqual(res.data.matchingSignals.observations, ['MARKER-only-for-matching']);
+  assert.deepEqual(res.data.matchingSignals.summary.observations, ['MARKER-only-for-matching']);
+  assert.ok(res.data.matchingSignals.raw.decisions, 'the raw record is included too');
   await c.del('/api/me');
   assert.equal(srv.store.data.signals[me.id], undefined, 'deleted with the account');
 });

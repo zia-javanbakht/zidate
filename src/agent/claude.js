@@ -101,7 +101,7 @@ Rules:
 
 let defaultClient;
 
-export function buildUserMessage({ user, convo, pending, answer, choiceApplied, next }) {
+export function buildUserMessage({ user, convo, pending, answer, choiceApplied, next, observations = [] }) {
   const recent = convo.messages
     .slice(-12)
     .map((m) => `${m.role === 'agent' ? 'Interviewer' : 'Person'}: ${m.text}`)
@@ -110,6 +110,7 @@ export function buildUserMessage({ user, convo, pending, answer, choiceApplied, 
     `Person: ${user.name}, ${user.basics.age ?? '?'} , ${user.basics.city ?? '?'}`,
     `Current hidden profile (for your reasoning only): ${JSON.stringify(describeHidden(user))}`,
     `Approved shared interests: ${user.shared.interests.join(', ') || 'none yet'}`,
+    observations.length ? `Your earlier private observations (for your reasoning only; never repeat them to the person): ${observations.slice(-8).join(' | ')}` : '',
     `Recent conversation:\n${recent || '(none)'}`,
     `Question being answered (${pending?.mode || 'self'}): ${pending?.text || '(none, free chat)'}`,
     choiceApplied ? 'They tapped a quick reply; that is already recorded, so traitUpdates can stay empty unless they added more.' : '',

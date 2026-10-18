@@ -6,7 +6,7 @@ import { normalizeCity } from '../cities.js';
 import { learnFromLike, createMatch } from '../social.js';
 import { cleanText } from '../profile.js';
 import { now } from '../clock.js';
-import { noteDecision, noteReport } from '../signals.js';
+import { noteDecision } from '../signals.js';
 
 export default function week(ctx) {
   const { store, route, HttpError } = ctx;
@@ -64,7 +64,6 @@ export default function week(ctx) {
     if (!pick) throw new HttpError(404, 'That person is not in your suggestions this week.');
     pick.decision ||= 'pass';
     store.data.blocks[`${user.id}>${params.id}`] = now().toISOString();
-    noteReport(store, params.id);
     store.data.reports.push({ id: store.id('r'), by: user.id, about: params.id, reason: cleanText(body.reason, 500) || 'Reported from a suggestion', at: now().toISOString(), status: 'open', source: 'suggestion' });
     return { body: { ok: true } };
   });

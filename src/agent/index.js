@@ -114,8 +114,9 @@ export function opening(user, convo) {
 const READY_LINE = 'I know enough to introduce you to your first two people. We can keep talking whenever you like: the more I know, the better the picks.';
 
 // Handle one message from the person. Returns the agent's reply message.
-// sink: optional callback for what the engine noticed that is kept only for matching.
-export async function respond(user, convo, rawText, engine = pickEngine(), sink = null) {
+// signals: optional { observations, save(list) } for the matchmaker's private observations,
+// which are kept with the matching signals, never on the person's profiles.
+export async function respond(user, convo, rawText, engine = pickEngine(), signals = null) {
   const text = cleanText(rawText, 1200);
   if (!text) throw Object.assign(new Error('Say something first.'), { status: 400 });
   convo.messages.push({ role: 'user', text, at: now().toISOString() });
@@ -163,7 +164,7 @@ export async function respond(user, convo, rawText, engine = pickEngine(), sink 
   const next = nextQuestion(user, convo);
   let result;
   try {
-    result = await engine.turn({ user, convo, pending, answer: text, choiceApplied, choice, next });
+    result = await engine.turn({ user, convo, pending, answer: text, choiceApplied, choice, next, observations: signals?.observations || [] });
   } catch (err) {
     if (engine === mockEngine) throw err;
     console.warn(`[agent] ${engine.name} failed, using offline engine: ${err.message}`);
@@ -180,7 +181,7 @@ export async function respond(user, convo, rawText, engine = pickEngine(), sink 
     }
   }
   const { observations, ...update } = result.update;
-  if (observations?.length) sink?.(observations);
+  if (observations?.length) signals?.save(observations);
   applyUpdate(user, update);
   if (!update.bio) {
     const bio = draftBio(user);

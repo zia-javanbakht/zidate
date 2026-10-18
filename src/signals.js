@@ -33,7 +33,6 @@ function blank() {
     // How other people react when this person is suggested to them.
     received: { shown: 0, liked: 0 },
     matches: { started: 0, replied: 0, firstMessages: 0, ghosted: 0, replyMin: 0, timed: 0 },
-    reportsAgainst: 0,
     observations: [],
   };
 }
@@ -159,9 +158,16 @@ export function noteCheckin(store, user, thread) {
   if (theirs > 0 && mine === 0) s.ghosted += 1;
 }
 
-export function noteReport(store, aboutId) {
-  if (store.data.users[aboutId]?.demo) return;
-  signalsOf(store, aboutId).reportsAgainst += 1;
+// Reports that still stand, counted once per reporter: one angry person reporting three
+// times is one report, and a report a moderator dismissed no longer counts.
+export function reportCounts(store) {
+  const by = new Map();
+  for (const r of store.data.reports || []) {
+    if (r.status === 'dismissed') continue;
+    if (!by.has(r.about)) by.set(r.about, new Set());
+    by.get(r.about).add(r.by);
+  }
+  return new Map([...by].map(([id, set]) => [id, set.size]));
 }
 
 // The matchmaker's private observations from the conversation (Claude only).
