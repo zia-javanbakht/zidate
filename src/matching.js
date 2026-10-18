@@ -194,9 +194,34 @@ function roundKm(d) {
 
 function sharedReason(a, b) {
   const common = a.shared.interests.filter((i) => b.shared.interests.includes(i));
-  if (common.length >= 2) return `You both like ${common[0]} and ${common[1]}.`;
-  if (common.length === 1) return `You both like ${common[0]}.`;
-  return 'Our conversations suggest you would get on.';
+  const fact = sharedFact(a, b);
+  if (common.length >= 2) return `You both like ${common[0]} and ${common[1]}.${fact ? ` ${fact}` : ''}`;
+  if (common.length === 1) return `You both like ${common[0]}.${fact ? ` ${fact}` : ''}`;
+  return fact || 'Our conversations suggest you would get on.';
+}
+
+// Something both chose to show that matters for a relationship (as OkCupid explains a match,
+// but in words, not a number). Only approved facts on both profiles, never hidden ones.
+const FACT_REASONS = {
+  lookingFor: { 'Something long-term': 'You are both looking for something long-term.', 'Seeing where it goes': 'You are both happy to see where it goes.' },
+  kids: { 'Wants kids': 'You both want kids one day.', "Doesn't want kids": 'Neither of you wants kids.', 'Has kids': 'You both have kids.' },
+  drinking: { "Doesn't drink": 'Neither of you drinks.' },
+  smoking: { "Doesn't smoke": 'Neither of you smokes.' },
+  diet: { Vegetarian: 'You are both vegetarian.', Vegan: 'You are both vegan.' },
+  pets: { 'Has pets': 'You both have pets.' },
+};
+
+function sharedFact(a, b) {
+  const shown = (u, k) => (u.shared.facts?.[k]?.status === 'approved' ? u.shared.facts[k].value : null);
+  for (const [k, lines] of Object.entries(FACT_REASONS)) {
+    const v = shown(a, k);
+    if (v && v === shown(b, k) && lines[v]) return lines[v];
+  }
+  const langs = (u) => (shown(u, 'languages') || '').toLowerCase().split(/[,/&]|\band\b/).map((x) => x.trim()).filter(Boolean);
+  const other = new Set(langs(b));
+  const both = langs(a).filter((l) => other.has(l) && l !== 'english');
+  if (both.length) return `You both speak ${both[0][0].toUpperCase()}${both[0].slice(1)}.`;
+  return null;
 }
 
 // Everyone ever suggested to this person. Kept as an index so ranking does not scan every

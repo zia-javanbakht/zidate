@@ -68,3 +68,27 @@ test('line feedback: short, clichéd and negative lines get a tip; specific ones
   assert.equal(lineFeedback('A trip I still think about', 'I love to travel, last year I finally went to Japan with my sister.').level, 'great', 'a cliché with a real detail is fine');
   assert.equal(lineFeedback('My ideal Sunday', 'Sleeping in and then going for a nice walk.').level, 'deeper');
 });
+
+import { reason } from '../../src/matching.js';
+
+test('why we picked them: facts both chose to show, never hidden ones', () => {
+  const store = new Store(null);
+  const a = person(store);
+  const b = person(store, { gender: 'man', seeking: 'women' });
+  assert.equal(reason(a, b), 'Our conversations suggest you would get on.');
+  a.hidden.tags.push('wants-kids');
+  b.hidden.tags.push('wants-kids');
+  assert.equal(reason(a, b), 'Our conversations suggest you would get on.', 'hidden tags are never named');
+  a.shared.facts.kids = { value: 'Wants kids', status: 'approved' };
+  b.shared.facts.kids = { value: 'Wants kids', status: 'suggested' };
+  assert.equal(reason(a, b), 'Our conversations suggest you would get on.', 'only approved facts');
+  b.shared.facts.kids.status = 'approved';
+  assert.equal(reason(a, b), 'You both want kids one day.');
+  a.shared.interests = ['films'];
+  b.shared.interests = ['films'];
+  assert.equal(reason(a, b), 'You both like films. You both want kids one day.');
+  delete a.shared.facts.kids;
+  a.shared.facts.languages = { value: 'English, Farsi', status: 'approved' };
+  b.shared.facts.languages = { value: 'farsi and French', status: 'approved' };
+  assert.equal(reason(a, b), 'You both like films. You both speak Farsi.');
+});
