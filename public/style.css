@@ -22,7 +22,7 @@
     --text: #ece8e1;
     --muted: #9c978e;
     --line: #2f2d2a;
-    --accent: #f2909b;
+    --accent: #e8788b;
     --accent-ink: #151413;
     --danger: #f2867e;
     --ok: #6fc28f;
@@ -38,7 +38,7 @@
   --text: #ece8e1;
   --muted: #9c978e;
   --line: #2f2d2a;
-  --accent: #f2909b;
+  --accent: #e8788b;
   --accent-ink: #151413;
   --danger: #f2867e;
   --ok: #6fc28f;
@@ -117,7 +117,7 @@ label { display: block; font-size: .875rem; color: var(--muted); margin-bottom: 
 
 /* Welcome */
 .welcome { min-height: 80dvh; display: flex; flex-direction: column; justify-content: center; gap: 28px; }
-.welcome .logo { width: 111px; height: auto; border-radius: 22px; background: #000; padding: 10px 14px; box-sizing: content-box; }
+.welcome .logo { width: 112px; height: 112px; }
 .welcome .lede { font-size: 1.15rem; color: var(--muted); max-width: 30ch; }
 .how { display: grid; gap: 10px; padding: 0; margin: 0; list-style: none; counter-reset: s; }
 .how li { counter-increment: s; display: flex; gap: 12px; color: var(--muted); }
