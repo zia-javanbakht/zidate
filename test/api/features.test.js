@@ -349,3 +349,33 @@ test('limits learned from passes can be lifted from the hidden profile', async (
   hidden = (await c.get('/api/profile')).data.hidden;
   assert.deepEqual(hidden.limits.map((l) => l.key), ['localOnly']);
 });
+
+test('matching signals stay on the server: never in app responses, only in the export', async () => {
+  const c = client(srv.base);
+  const { me } = await onboard(c, { email: `sig${Math.random()}@x.co` });
+  const sig = srv.store.data.signals[me.id];
+  assert.ok(sig && sig.chat.answers > 0, 'answers were recorded');
+  sig.observations.push({ text: 'MARKER-only-for-matching', at: new Date().toISOString() });
+  for (const url of ['/api/me', '/api/profile', '/api/chat', '/api/week', '/api/matches']) {
+    const r = await c.get(url);
+    assert.ok(!JSON.stringify(r.data).includes('MARKER-only-for-matching'), `${url} leaks signals`);
+    assert.ok(!JSON.stringify(r.data).includes('activeHours'), `${url} leaks signals`);
+  }
+  const res = await c.get('/api/me/export');
+  assert.deepEqual(res.data.matchingSignals.observations, ['MARKER-only-for-matching']);
+  await c.del('/api/me');
+  assert.equal(srv.store.data.signals[me.id], undefined, 'deleted with the account');
+});
+
+test('the profile guide comes with the profile, and "no dealbreakers" ticks that step', async () => {
+  const c = client(srv.base);
+  await onboard(c, { email: `guide${Math.random()}@x.co`, answers: { ...ANSWERS, q_dealbreakers: 'Skip' } });
+  let { guide } = (await c.get('/api/profile')).data;
+  assert.ok(guide.shared.steps.length && guide.hidden.steps.length);
+  assert.equal(guide.next.id, 'photo');
+  const step = (g) => g.hidden.steps.find((s) => s.id === 'dealbreakers');
+  if (!step(guide).done) {
+    guide = (await c.post('/api/profile/dealbreakers/none')).data.guide;
+    assert.equal(step(guide).done, true);
+  }
+});

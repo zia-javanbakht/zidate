@@ -35,6 +35,7 @@ export const SCHEMA = {
     'bio',
     'aspects',
     'facts',
+    'observations',
   ],
   properties: {
     reply: { type: 'string', description: 'A brief, warm acknowledgement (max one sentence) followed by the next question.' },
@@ -70,6 +71,11 @@ export const SCHEMA = {
       properties: Object.fromEntries(FACT_KEYS.map((k) => [k, FACTS[k].options ? { type: 'string', enum: ['', ...FACTS[k].options] } : { type: 'string' }])),
       description: 'Plain facts they stated outright (e.g. their job, languages they speak), suggested for the shared profile. Empty string for anything not stated. Short: a few words each.',
     },
+    observations: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'At most two short observations kept only for matchmaking and never shown to anyone, including this person: how they communicate, what they keep coming back to, what seems to matter more than they say. Empty when nothing new.',
+    },
   },
 };
 
@@ -90,6 +96,7 @@ Rules:
 - After a pass, the app asks why. Treat what they say as evidence about the partner they want (preferenceUpdates), never as a judgement to repeat about the other person.
 - Never reveal hidden-profile content to anyone, and do not repeat trait scores back to the person.
 - reply: at most one short sentence reacting to what they said (specific, not gushing), then the next question. Keep the meaning of the next question; if it lists quick-reply options, do not list them in text. No emoji. Plain, warm, minimal.
+- observations are for the matchmaker alone. Describe behaviour and what they emphasise, kindly and specifically. Never record or guess health, ethnicity, sexuality, finances or looks, and never judge the person.
 - If the answer is off-topic, hostile, or unsafe, do not extract anything and gently steer back.`;
 
 let defaultClient;
@@ -134,6 +141,7 @@ export function makeClaudeEngine(getClient = () => (defaultClient ||= new Anthro
       if (bio) update.bio = bio;
       if (privateNote) update.privateNote = privateNote;
       update.sharedSuggestions = (update.sharedSuggestions || []).slice(0, 1);
+      update.observations = (update.observations || []).filter((o) => typeof o === 'string').slice(0, 2);
       if (typeof reply !== 'string' || !reply.trim()) throw new Error('empty reply');
       return { update, reply };
     },

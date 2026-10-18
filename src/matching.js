@@ -4,6 +4,7 @@ import { basicsDone } from './profile.js';
 import { isReady, publicProfile, settingsOf } from './profile.js';
 import { normalizeCity } from './cities.js';
 import { weekKey, nextWeekStart, now } from './clock.js';
+import { revealedPreferences, likeChance, responsiveness, popularity, hoursOverlap, noteShown } from './signals.js';
 
 export const PER_WEEK = 2;
 
@@ -104,6 +105,38 @@ export function compatibility(a, b) {
   return Math.sqrt(x * y);
 }
 
+// Adjustment from what people do rather than what they say (see signals.js).
+// Small on purpose: behaviour refines the picks, it never overrides the conversation.
+export function signalBoost(store, a, b) {
+  if (!store.data.signals) return 0;
+  const [sa, sb] = [store.data.signals[a.id], store.data.signals[b.id]];
+  let boost = 0;
+  // a has tended to like people like b (and b people like a).
+  for (const [sig, x, y] of [[sa, a, b], [sb, b, a]]) {
+    const rev = revealedPreferences(sig);
+    let num = 0;
+    let den = 0;
+    for (const [k, { target, weight }] of Object.entries(rev)) {
+      const t = y.hidden.traits[k];
+      if (t.confidence < 0.2) continue;
+      num += weight * (1 - Math.abs(target - t.value));
+      den += weight;
+    }
+    if (den) boost += (num / den - 0.5) * 0.16;
+    const chance = likeChance(sig, x, y);
+    if (chance != null) boost += (chance - 0.5) * 0.08;
+  }
+  // People who leave their matches unanswered, or who have been reported, come later.
+  const r = responsiveness(sb);
+  if (r != null) boost += (r - 0.7) * 0.12;
+  boost -= Math.min(0.15, (sb?.reportsAgainst || 0) * 0.05);
+  // Spread attention: someone almost everyone likes does not need to be in every pair.
+  boost -= (popularity(sb) - 0.5) * 0.06;
+  const hours = hoursOverlap(sa, sb);
+  if (hours != null) boost += (hours - 0.5) * 0.04;
+  return boost;
+}
+
 // A reason shown to the person. Built only from shared information, never hidden traits.
 export function reason(a, b) {
   const away = sameCity(a, b) ? '' : ` A little further away, in ${b.basics.city}.`;
@@ -177,11 +210,12 @@ export function weeklyPicks(store, user) {
       // Either person may have asked to only meet people in their own city.
       .filter((o) => sameCity(user, o) || !(user.hidden.limits?.localOnly || o.hidden.limits?.localOnly))
       // Someone who already liked this person is a likely mutual match: give them a lift.
-      .map((o) => ({ o, s: compatibility(user, o) + (store.data.likes[`${o.id}>${user.id}`] ? 0.15 : 0), local: sameCity(user, o) }))
+      .map((o) => ({ o, s: compatibility(user, o) + signalBoost(store, user, o) + (store.data.likes[`${o.id}>${user.id}`] ? 0.15 : 0), local: sameCity(user, o) }))
       // People nearby come first; only widen the search when the city runs out.
       .sort((p, q) => q.local - p.local || q.s - p.s || p.o.id.localeCompare(q.o.id));
     week = { createdAt: now().toISOString(), picks: ranked.slice(0, PER_WEEK).map(({ o, s }) => ({ id: o.id, score: Math.round(s * 100) / 100, decision: null })) };
     store.data.weeks[key] = week;
+    for (const p of week.picks) noteShown(store, store.data.users[p.id]);
     store.save();
   }
   return {

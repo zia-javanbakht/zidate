@@ -20,12 +20,13 @@ async function toDataUrl(file, max = 1280) {
   }
 }
 
-export async function profile() {
+export async function profile(section = '') {
   const data = await api('GET', '/api/profile');
   setMe(data.me);
   const { shared, hidden, preview, photos } = data;
   const me = state.me;
   const reload = () => profile();
+  const { guide } = data;
   const act = (fn) => async () => {
     try {
       await fn();
@@ -44,7 +45,7 @@ export async function profile() {
     toast('Photo added.');
     reload();
   });
-  const photoBlock = h('section', { class: 'card stack' },
+  const photoBlock = h('section', { class: 'card stack', id: 'photos' },
     h('div', { class: 'section-head' }, h('h2', {}, 'Photos'), h('span', { class: 'small muted' }, `${photos.length} of 4`)),
     h('div', { class: 'photos' },
       photos.map((p, i) => h('div', { class: 'photo' },
@@ -81,7 +82,7 @@ export async function profile() {
     await api('PUT', '/api/profile/bio', { text: v.text });
     reload();
   });
-  const bioBlock = h('div', { class: 'item' },
+  const bioBlock = h('div', { class: 'item', id: 'bio' },
     h('div', { class: 'prompt' }, 'Bio'),
     h('p', { class: 'text' }, shared.bio || h('span', { class: 'muted' }, 'No bio yet.')),
     shared.bioDraft && shared.bioDraft !== shared.bio
@@ -138,7 +139,7 @@ export async function profile() {
   });
   const shownFacts = factKeys.filter((k) => facts[k] && facts[k].status !== 'hidden');
   const suggestedFacts = shownFacts.filter((k) => facts[k].status === 'suggested');
-  const factsBlock = h('div', { class: 'item' },
+  const factsBlock = h('div', { class: 'item', id: 'facts' },
     h('div', { class: 'prompt' }, 'About'),
     shownFacts.length
       ? h('ul', { class: 'facts' }, shownFacts.map((k) => h('li', {},
@@ -162,9 +163,9 @@ export async function profile() {
       : null,
     bioBlock,
     factsBlock,
-    ...itemNodes,
+    h('div', { id: 'lines', class: 'stack' }, ...itemNodes),
     h('div', { class: 'item' }, h('button', { class: 'btn small ghost', onclick: addLine }, '+ Add a line of my own')),
-    h('div', { class: 'item' }, h('div', { class: 'prompt' }, 'Interests'),
+    h('div', { class: 'item', id: 'interests' }, h('div', { class: 'prompt' }, 'Interests'),
       h('ul', { class: 'tags' },
         shared.interests.map((i) => h('li', {}, i, h('button', { 'aria-label': `Remove ${i}`, onclick: act(async () => { await api('DELETE', `/api/profile/interests/${encodeURIComponent(i)}`); reload(); }) }, '×'))),
         shared.interests.length < 12 ? h('li', {}, h('button', { class: 'add-tag', onclick: addInterest }, '+ Add')) : null)));
@@ -200,10 +201,13 @@ export async function profile() {
     hidden.summary ? h('p', { class: 'bio summary' }, hidden.summary) : null,
     h('div', {}, traits),
     hidden.tags.length ? h('div', {}, h('div', { class: 'prompt small muted' }, 'Noted'), h('ul', { class: 'tags' }, hidden.tags.map((t) => h('li', {}, pretty(t))))) : null,
-    h('div', {}, h('div', { class: 'prompt small muted' }, 'Dealbreakers'),
+    h('div', { id: 'dealbreakers' }, h('div', { class: 'prompt small muted' }, 'Dealbreakers'),
       h('ul', { class: 'tags' },
         hidden.dealbreakers.map((t) => h('li', {}, pretty(t), h('button', { 'aria-label': `Remove dealbreaker ${pretty(t)}`, onclick: act(async () => { await api('DELETE', `/api/profile/dealbreakers/${encodeURIComponent(t)}`); reload(); }) }, '×'))),
-        h('li', {}, h('button', { class: 'add-tag', onclick: addDealbreaker }, '+ Add')))),
+        h('li', {}, h('button', { class: 'add-tag', onclick: addDealbreaker }, '+ Add')),
+        !hidden.dealbreakers.length && guide.hidden.steps.find((s) => s.id === 'dealbreakers')?.done === false
+          ? h('li', {}, h('button', { class: 'add-tag', onclick: act(async () => { await api('POST', '/api/profile/dealbreakers/none'); toast('Noted: no dealbreakers.'); reload(); }) }, 'I have none'))
+          : null)),
     hidden.aspects?.length ? h('div', {}, h('div', { class: 'prompt small muted' }, 'Also noted'), h('ul', { class: 'tags' }, hidden.aspects.map((a) => h('li', {}, cap(a.label))))) : null,
     hidden.limits?.length ? h('div', {}, h('div', { class: 'prompt small muted' }, 'Learned from your passes'),
       h('ul', { class: 'tags' }, hidden.limits.map((l) => h('li', {}, l.text,
@@ -213,7 +217,7 @@ export async function profile() {
 
   render(h('div', { class: 'stack' },
     h('div', { class: 'section-head' }, h('h1', {}, me.name), h('a', { class: 'btn small ghost', href: '#/settings' }, 'Settings')),
-    progress(me.completeness),
+    guide.complete ? progress(me.completeness) : guideCard(guide),
     me.settings.paused ? h('div', { class: 'banner' }, h('span', {}, 'You are paused, so no one sees you.'), h('a', { href: '#/settings' }, 'Change')) : null,
     photoBlock,
     sharedBlock,
@@ -221,4 +225,26 @@ export async function profile() {
       h('summary', {}, 'Preview as a match sees it'),
       h('div', { style: 'margin-top:16px' }, personCard(preview))),
     hiddenBlock));
+  // Links like #/profile/bio open the page at that part.
+  if (section) document.getElementById(section)?.scrollIntoView({ block: 'center' });
+}
+
+// "Finish your profile": both profiles' progress and the next few things to do.
+function guideCard(guide) {
+  const bar = (label, pct) => h('div', { class: 'guide-bar' },
+    h('div', { class: 'label' }, h('span', {}, label), h('span', { class: 'muted' }, `${pct}%`)),
+    h('div', { class: 'meter', role: 'progressbar', 'aria-label': label, 'aria-valuenow': pct, 'aria-valuemin': 0, 'aria-valuemax': 100 }, h('i', { style: `width:${pct}%` })));
+  const todo = [...guide.shared.steps, ...guide.hidden.steps].filter((s) => !s.done && s.id !== guide.next?.id).slice(0, 2);
+  const go = (href) => () => {
+    if (location.hash === href) document.getElementById(href.split('/')[2])?.scrollIntoView({ block: 'center' });
+    location.hash = href;
+  };
+  return h('section', { class: 'card stack guide' },
+    h('h2', {}, 'Finish your profile'),
+    bar('Shared profile (what matches see)', guide.shared.percent),
+    bar('Hidden profile (how I choose)', guide.hidden.percent),
+    guide.next ? h('div', { class: 'next' },
+      h('p', {}, h('strong', {}, 'Next: '), guide.next.label),
+      h('button', { class: 'btn small accent', type: 'button', onclick: go(guide.next.action.href) }, guide.next.action.label)) : null,
+    todo.length ? h('ul', { class: 'todo' }, todo.map((s) => h('li', {}, h('button', { class: 'link', type: 'button', onclick: go(s.action.href) }, s.label)))) : null);
 }

@@ -3,6 +3,7 @@ import { publicProfile, cleanText } from '../profile.js';
 import { demoReply, icebreakers } from '../social.js';
 import { isAbusive, STRIKES_BEFORE_REPORT } from '../moderation.js';
 import { now } from '../clock.js';
+import { noteMessage, noteReport } from '../signals.js';
 
 export default function matches(ctx) {
   const { store, route, HttpError, hub, notify } = ctx;
@@ -74,6 +75,7 @@ export default function matches(ctx) {
     }
     const msg = { from: user.id, text, at: now().toISOString() };
     store.data.messages[m.id].push(msg);
+    noteMessage(store, user, store.data.messages[m.id]);
     m.seen = { ...m.seen, [user.id]: msg.at };
     if (other) {
       hub.publish(other.id, 'message', { matchId: m.id, message: view(msg, other) });
@@ -98,6 +100,7 @@ export default function matches(ctx) {
     const m = getMatch(user, params.id);
     const otherId = m.users.find((u) => u !== user.id);
     if (body.report) {
+      noteReport(store, otherId);
       store.data.reports.push({
         id: store.id('r'), by: user.id, about: otherId, reason: cleanText(body.reason, 500), at: now().toISOString(), status: 'open', source: 'match',
         // Moderators see the last messages as context.

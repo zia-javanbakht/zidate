@@ -12,6 +12,7 @@ import { createHub } from './events.js';
 import { createMailer } from './mailer.js';
 import { createPhotoStore } from './photos.js';
 import { now } from './clock.js';
+import { noteActive } from './signals.js';
 import account from './routes/account.js';
 import chat from './routes/chat.js';
 import profile from './routes/profile.js';
@@ -172,6 +173,7 @@ export function createApp(store, opts = {}) {
       if (user?.suspended) user = null;
       if (r.auth && !user) throw new HttpError(401, 'Please sign in.');
       if (r.admin && !isAdmin(user)) throw new HttpError(403, 'Only for moderators.');
+      if (user && url.pathname === '/api/me') noteActive(store, user);
       const body = mutating ? await readBody(req, r.bodyLimit) : {};
       const out = await r.handler({ req, res, user, token, params, query: url.searchParams, body: body && typeof body === 'object' ? body : {} });
       store.save();

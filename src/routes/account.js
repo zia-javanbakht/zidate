@@ -5,6 +5,7 @@ import { cleanText, settingsOf, describeHidden } from '../profile.js';
 import { normalizeCity } from '../cities.js';
 import { now, validTimeZone } from '../clock.js';
 import { currentWeek } from '../matching.js';
+import { signalsOf, summarizeSignals, forget } from '../signals.js';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TOKEN_TTL = { verify: 7 * 864e5, reset: 3600e3 };
@@ -198,6 +199,8 @@ export default function account(ctx) {
       account: { name: user.name, email: user.email, createdAt: user.createdAt, basics: user.basics, settings: settingsOf(user) },
       sharedProfile: user.shared,
       hiddenProfile: { ...describeHidden(user), raw: user.hidden },
+      // Kept only for matching and never shown in the app; included here because it is yours.
+      matchingSignals: summarizeSignals(signalsOf(store, user.id)),
       photos: (user.photos || []).map((p) => p.id),
       conversationWithMatchmaker: store.data.conversations[user.id]?.messages || [],
       likes: mine('likes'),
@@ -222,6 +225,7 @@ export default function account(ctx) {
     for (const p of user.photos || []) photos.remove(p.id);
     delete store.data.users[id];
     delete store.data.conversations[id];
+    forget(store, id);
     delete store.data.notifications?.[id];
     endSessions(id);
     for (const [t, v] of Object.entries(store.data.tokens || {})) if (v.userId === id) delete store.data.tokens[t];

@@ -5,6 +5,7 @@ import { askNow } from '../agent/index.js';
 import { INTERESTS, TAGS, FACTS, FACT_KEYS } from '../traits.js';
 import { decodeUpload, mimeFor, MAX_PHOTOS } from '../photos.js';
 import { matchId, currentWeek } from '../matching.js';
+import { profileGuide } from '../guide.js';
 
 const NO_CONTACT = 'Keep contact details off your profile. You can share them once you match.';
 export const PROMPTS = [
@@ -23,6 +24,7 @@ export default function profile({ store, route, HttpError, meView, photos }) {
       photos: (user.photos || []).map((p) => ({ id: p.id, url: `/api/photos/${p.id}` })),
       preview: publicProfile(user, { showPhotos: true }),
       hidden: describeHidden(user),
+      guide: profileGuide(user),
       prompts: PROMPTS,
       interests: INTERESTS,
       tags: TAGS,
@@ -158,6 +160,12 @@ export default function profile({ store, route, HttpError, meView, photos }) {
     if (!TAGS.includes(tag)) throw new HttpError(400, 'Pick one from the list.');
     if (!user.hidden.dealbreakers.includes(tag)) user.hidden.dealbreakers.push(tag);
     return { body: { dealbreakers: user.hidden.dealbreakers } };
+  });
+
+  // "I have none" also counts as having thought about it.
+  route('POST', '/api/profile/dealbreakers/none', async ({ user }) => {
+    user.guide = { ...user.guide, noDealbreakers: true };
+    return { body: { guide: profileGuide(user) } };
   });
 
   route('DELETE', '/api/profile/dealbreakers/:tag', async ({ user, params }) => {

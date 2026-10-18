@@ -300,3 +300,13 @@ input[type=number] { width: 100%; padding: 11px 12px; border: 1px solid var(--li
 .top nav { margin-left: auto; }
 .msg.them { background: var(--surface); border: 1px solid var(--line); padding: 9px 14px; border-radius: 18px 18px 18px 4px; }
 .report-link { margin-top: 14px; }
+
+/* --- profile guide --- */
+.guide .guide-bar { display: grid; gap: 6px; }
+.guide .label { display: flex; justify-content: space-between; font-size: .9rem; }
+.guide .meter { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.guide .meter i { display: block; height: 100%; background: var(--accent); border-radius: inherit; transition: width .3s ease; }
+.guide .next { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.guide .next p { margin: 0; }
+.guide .todo { margin: 0; padding-left: 18px; color: var(--muted); font-size: .9rem; }
+.guide .todo .link { text-align: left; }

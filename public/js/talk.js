@@ -18,6 +18,10 @@ export async function talk() {
       log.append(h('div', { class: 'notice' }, h('p', {}, m.text), h('a', { class: 'btn accent small', href: '#/week' }, 'Meet this week’s two')));
       return;
     }
+    if (m.notice === 'guide') {
+      log.append(h('div', { class: 'notice' }, h('p', {}, m.text), h('a', { class: 'btn small ghost', href: m.link }, m.label)));
+      return;
+    }
     log.append(h('p', { class: `msg ${m.role}` }, m.text));
   };
   messages.forEach(add);
