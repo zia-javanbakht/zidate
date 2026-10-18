@@ -2,14 +2,14 @@
 import { respond, opening, resume, SKIP_RE } from '../agent/index.js';
 import { noteAnswer, noteObservations, signalsOf } from '../signals.js';
 
-export default function chat({ store, route, HttpError, meView }) {
+export default function chat({ store, route, HttpError, meView, serial }) {
   route('GET', '/api/chat', async ({ user }) => {
     const convo = store.data.conversations[user.id];
     if (!opening(user, convo)) resume(user, convo);
     return { body: { messages: convo.messages, me: meView(user) } };
-  });
+  }, { saves: true });
 
-  route('POST', '/api/chat', async ({ user, body }) => {
+  route('POST', '/api/chat', async ({ user, body }) => serial(user.id, async () => {
     if (user.blocked) throw new HttpError(403, 'This account cannot continue.');
     const convo = store.data.conversations[user.id];
     opening(user, convo);
@@ -27,5 +27,5 @@ export default function chat({ store, route, HttpError, meView }) {
       noteAnswer(store, user, { text, askedAt, skipped: SKIP_RE.test(text), quickReply });
     }
     return { body: { message, messages: convo.messages.slice(start), me: meView(user) } };
-  });
+  }));
 }

@@ -96,7 +96,7 @@ export default function account(ctx) {
   });
 
   // Signed-out is a normal state for this endpoint, not an error.
-  route('GET', '/api/me', async ({ user }) => ({ body: { user: user ? meView(user) : null } }), { auth: false });
+  route('GET', '/api/me', async ({ user }) => ({ body: { user: user ? meView(user) : null } }), { auth: false, saves: true });
 
   // --- email verification ---
   route('POST', '/api/verify', async ({ body }) => {
@@ -226,6 +226,7 @@ export default function account(ctx) {
     delete store.data.users[id];
     delete store.data.conversations[id];
     forget(store, id);
+    delete store.data.suggested?.[id];
     delete store.data.notifications?.[id];
     endSessions(id);
     for (const [t, v] of Object.entries(store.data.tokens || {})) if (v.userId === id) delete store.data.tokens[t];

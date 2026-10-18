@@ -392,3 +392,32 @@ test('the profile guide comes with the profile, and "no dealbreakers" ticks that
     assert.equal(step(guide).done, true);
   }
 });
+
+test('per-person requests that wait on the matchmaker run one at a time', async () => {
+  const order = [];
+  const slow = (name, ms) => srv.ctx.serial('u_lock', async () => {
+    order.push(`${name}:start`);
+    await new Promise((r) => setTimeout(r, ms));
+    order.push(`${name}:end`);
+  });
+  await Promise.all([slow('answer', 30), slow('pass', 1)]);
+  assert.deepEqual(order, ['answer:start', 'answer:end', 'pass:start', 'pass:end']);
+  // A failure does not jam the queue.
+  await assert.rejects(srv.ctx.serial('u_lock', async () => { throw new Error('boom'); }));
+  assert.equal(await srv.ctx.serial('u_lock', async () => 'ok'), 'ok');
+});
+
+test('plain reads do not rewrite the store', async () => {
+  const c = client(srv.base);
+  await onboard(c);
+  let saves = 0;
+  const orig = srv.store.save.bind(srv.store);
+  srv.store.save = () => { saves++; orig(); };
+  await c.get('/api/profile');
+  await c.get('/api/notifications');
+  await c.get('/api/matches');
+  assert.equal(saves, 0);
+  await c.get('/api/week');
+  assert.ok(saves > 0, 'a read that creates the week still saves');
+  srv.store.save = orig;
+});

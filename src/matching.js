@@ -150,13 +150,18 @@ function sharedReason(a, b) {
   return 'Our conversations suggest you would get on.';
 }
 
+// Everyone ever suggested to this person. Kept as an index so ranking does not scan every
+// week of every person; built once from the weeks for data saved before the index existed.
 function everSuggested(store, userId) {
-  const seen = new Set();
-  for (const [key, week] of Object.entries(store.data.weeks)) {
-    if (!key.startsWith(`${userId}:`)) continue;
-    for (const p of week.picks) seen.add(p.id);
+  store.data.suggested ||= {};
+  if (!store.data.suggested[userId]) {
+    const ids = new Set();
+    for (const [key, week] of Object.entries(store.data.weeks)) {
+      if (key.startsWith(`${userId}:`)) for (const p of week.picks) ids.add(p.id);
+    }
+    store.data.suggested[userId] = [...ids];
   }
-  return seen;
+  return new Set(store.data.suggested[userId]);
 }
 
 // Someone who already said no, or an unmatched/reported pair, is never suggested.
@@ -213,6 +218,7 @@ export function fillWeek(store, user, week) {
   const fresh = rank(store, user).slice(0, Math.max(0, PER_WEEK - week.picks.length));
   for (const { o, s } of fresh) {
     week.picks.push({ id: o.id, score: Math.round(s * 100) / 100, decision: null });
+    store.data.suggested[user.id].push(o.id);
     noteShown(store, o);
   }
   return fresh.length;

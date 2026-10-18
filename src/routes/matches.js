@@ -59,7 +59,7 @@ export default function matches(ctx) {
         icebreakers: msgs.length || !other ? [] : icebreakers(user, other),
       },
     };
-  });
+  }, { saves: true });
 
   route('POST', '/api/matches/:id', async ({ user, params, body }) => {
     const m = getMatch(user, params.id);

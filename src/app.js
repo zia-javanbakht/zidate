@@ -64,6 +64,7 @@ export function createApp(store, opts = {}) {
   // People stored before the profile gained new parts get them now.
   for (const u of Object.values(store.data.users)) upgradeUser(u);
   const allow = limiter();
+  const locks = new Map();
   const { route, match } = router();
   const hub = createHub();
   const photos = createPhotoStore(photoDir);
@@ -82,6 +83,16 @@ export function createApp(store, opts = {}) {
     },
     endSessions(userId, except = null) {
       for (const [t, s] of Object.entries(store.data.sessions)) if (s.userId === userId && t !== except) delete store.data.sessions[t];
+    },
+    // One request at a time per person for flows that read, wait (e.g. for Claude) and then
+    // write, so a pass landing mid-answer cannot have its question overwritten.
+    serial(userId, fn) {
+      const prev = locks.get(userId) || Promise.resolve();
+      const run = prev.then(fn, fn);
+      const done = run.catch(() => {});
+      locks.set(userId, done);
+      done.then(() => locks.get(userId) === done && locks.delete(userId));
+      return run;
     },
     meView(user) {
       return {
@@ -176,7 +187,8 @@ export function createApp(store, opts = {}) {
       if (user && url.pathname === '/api/me') noteActive(store, user);
       const body = mutating ? await readBody(req, r.bodyLimit) : {};
       const out = await r.handler({ req, res, user, token, params, query: url.searchParams, body: body && typeof body === 'object' ? body : {} });
-      store.save();
+      // Writing the whole store is not free: only after changes, or reads that change state.
+      if (mutating || r.saves) store.save();
       if (out?.handled) return; // the route wrote its own response (streams, files)
       send(res, out.status || 200, out.body, out.headers);
     } catch (err) {

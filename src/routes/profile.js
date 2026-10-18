@@ -17,7 +17,7 @@ export const PROMPTS = [
   'A story that still makes me laugh',
 ];
 
-export default function profile({ store, route, HttpError, meView, photos }) {
+export default function profile({ store, route, HttpError, meView, photos, serial }) {
   route('GET', '/api/profile', async ({ user }) => ({
     body: {
       shared: user.shared,
@@ -82,7 +82,7 @@ export default function profile({ store, route, HttpError, meView, photos }) {
   });
 
   // "That's not me": forget most of what we inferred and ask directly.
-  route('POST', '/api/profile/traits/:key/recheck', async ({ user, params }) => {
+  route('POST', '/api/profile/traits/:key/recheck', async ({ user, params }) => serial(user.id, async () => {
     const t = user.hidden.traits[params.key];
     if (!t) throw new HttpError(404, 'Not found.');
     user.hidden.traits[params.key] = { value: 0.5, confidence: t.confidence * 0.3 };
@@ -91,7 +91,7 @@ export default function profile({ store, route, HttpError, meView, photos }) {
     convo.events.unshift({ type: 'recheck', trait: params.key });
     if (basicsDone(user)) askNow(user, convo);
     return { body: { ok: true } };
-  });
+  }));
 
   // Facts (work, languages, kids…): set several at once. An empty value removes one.
   // Anything the person sets themselves is shown straight away.

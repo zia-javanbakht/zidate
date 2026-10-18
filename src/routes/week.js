@@ -9,13 +9,13 @@ import { now } from '../clock.js';
 import { noteDecision } from '../signals.js';
 
 export default function week(ctx) {
-  const { store, route, HttpError } = ctx;
+  const { store, route, HttpError, serial } = ctx;
 
-  route('GET', '/api/week', async ({ user }) => ({ body: weeklyPicks(store, user) }));
+  route('GET', '/api/week', async ({ user }) => ({ body: weeklyPicks(store, user) }), { saves: true });
 
   // A short week: look further (more age range, and lift limits learned from passes),
   // then top the week up. People already in it, and decisions already made, stay.
-  route('POST', '/api/week/widen', async ({ user }) => {
+  route('POST', '/api/week/widen', async ({ user }) => serial(user.id, async () => {
     const wk = weeklyPicks(store, user);
     if (!wk.ready || wk.paused) throw new HttpError(409, 'There is nothing to widen yet.');
     const week = store.data.weeks[`${user.id}:${currentWeek(user)}`];
@@ -30,9 +30,9 @@ export default function week(ctx) {
     for (const k of ['localOnly', 'ageMin', 'ageMax']) delete l[k];
     const added = fillWeek(store, user, week);
     return { body: { ageRange: user.basics.ageRange, lifted, added, ...weeklyPicks(store, user) } };
-  });
+  }));
 
-  route('POST', '/api/week/:id', async ({ user, params, body }) => {
+  route('POST', '/api/week/:id', async ({ user, params, body }) => serial(user.id, async () => {
     const decision = body.decision;
     if (!['like', 'pass'].includes(decision)) throw new HttpError(400, 'Decide like or pass.');
     const wk = store.data.weeks[`${user.id}:${currentWeek(user)}`];
@@ -59,7 +59,7 @@ export default function week(ctx) {
       if (convo.pending?.kind !== 'feedback') askNow(user, convo);
     } else if (!match) queueEvent(convo, { type: decision, candidateId: other.id, name: other.name });
     return { body: { decision, match: match ? { id: match.id } : null } };
-  });
+  }));
 
   // Report someone straight from a suggestion. They are never suggested again.
   route('POST', '/api/week/:id/report', async ({ user, params, body }) => {

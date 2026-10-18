@@ -20,6 +20,7 @@ export function backup(file, { keep = 7, dir = null } = {}) {
 export function tick(store, ctx) {
   const picks = runWeekly(store, ctx.notify);
   const checkins = runCheckins(ctx);
+  store.pruneSessions();
   if (picks || checkins) store.save();
   return { picks, checkins, backup: backup(store.file) };
 }
