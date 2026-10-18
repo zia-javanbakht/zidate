@@ -24,7 +24,7 @@ test('guide: new people start with the hidden profile; ready people with the sha
   let g = profileGuide(u);
   assert.equal(g.next.id, 'basics');
   assert.equal(g.hidden.percent, 0);
-  assert.equal(g.shared.percent, 17); // nothing waiting for approval already counts
+  assert.equal(g.shared.percent, 14); // nothing waiting for approval already counts (1 of 7 steps)
   const r = person(store);
   g = profileGuide(r);
   assert.equal(g.next.id, 'photo');
@@ -202,6 +202,7 @@ test('nudges skip a step they just nudged and reach the dealbreakers too', async
   for (let i = 0; i < 3; i++) u.shared.items.push({ id: `i${i}`, text: 'x', status: 'approved' });
   u.shared.facts = { work: { value: 'Nurse', status: 'approved' }, kids: { value: 'Wants kids', status: 'approved' }, pets: { value: 'No pets', status: 'approved' } };
   u.shared.interests = ['hiking', 'music', 'films'];
+  u.shared.openers = ['What is the best thing you ate this week?'];
   convo.flags.sinceNudge = 5;
   opening(u, convo);
   const { mockEngine } = await import('../../src/agent/mock.js');

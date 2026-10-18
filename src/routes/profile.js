@@ -6,6 +6,8 @@ import { INTERESTS, TAGS, FACTS, FACT_KEYS } from '../traits.js';
 import { decodeUpload, mimeFor, MAX_PHOTOS } from '../photos.js';
 import { matchId, currentWeek } from '../matching.js';
 import { profileGuide } from '../guide.js';
+import { isAbusive } from '../moderation.js';
+import { lineFeedback } from '../feedback.js';
 
 const NO_CONTACT = 'Keep contact details off your profile. You can share them once you match.';
 export const PROMPTS = [
@@ -17,6 +19,16 @@ export const PROMPTS = [
   'A story that still makes me laugh',
 ];
 
+// Opening questions (as Bumble's Opening Moves): up to three questions a match can answer
+// to start the conversation, so nobody has to think of a first line.
+export const OPENERS = [
+  'What is the best thing you ate this week?', 'What are you looking forward to right now?',
+  'What would a perfect Saturday look like for you?', 'Two truths and a lie: go.',
+  'What is a small thing that always makes your day?', 'What is the last thing you got really excited about?',
+  'Which place would you go back to tomorrow?', 'What are you better at than most people?',
+];
+export const MAX_OPENERS = 3;
+
 export default function profile({ store, route, HttpError, meView, photos, serial }) {
   route('GET', '/api/profile', async ({ user }) => ({
     body: {
@@ -25,7 +37,10 @@ export default function profile({ store, route, HttpError, meView, photos, seria
       preview: publicProfile(user, { showPhotos: true }),
       hidden: describeHidden(user),
       guide: profileGuide(user),
+      // Tips on the lines the person wrote themselves (the matchmaker's are already shaped).
+      feedback: Object.fromEntries(user.shared.items.filter((i) => i.own).map((i) => [i.id, lineFeedback(i.prompt, i.text)])),
       prompts: PROMPTS,
+      openers: OPENERS,
       interests: INTERESTS,
       tags: TAGS,
       facts: FACTS,
@@ -49,7 +64,14 @@ export default function profile({ store, route, HttpError, meView, photos, seria
     if (user.shared.items.length >= 30) throw new HttpError(400, 'That is plenty. Remove one first.');
     const item = { id: `it_${Math.random().toString(36).slice(2, 10)}`, prompt, text, status: 'approved', own: true };
     user.shared.items.push(item);
-    return { status: 201, body: { item } };
+    return { status: 201, body: { item, feedback: lineFeedback(prompt, text) } };
+  });
+
+  // Check a line before saving it.
+  route('POST', '/api/profile/items/feedback', async ({ body }) => {
+    const text = cleanText(body.text, 300);
+    if (!text) throw new HttpError(400, 'Write something first.');
+    return { body: { feedback: lineFeedback(cleanText(body.prompt, 80), text) } };
   });
 
   route('PATCH', '/api/profile/items/:id', async ({ user, params, body }) => {
@@ -64,13 +86,29 @@ export default function profile({ store, route, HttpError, meView, photos, seria
       if (!text) throw new HttpError(400, 'It cannot be empty.');
       if (hasContactInfo(text)) throw new HttpError(400, NO_CONTACT);
       item.text = text;
+      item.own = true; // edited in their own words
     }
-    return { body: { item } };
+    return { body: { item, ...(typeof body.text === 'string' ? { feedback: lineFeedback(item.prompt, item.text) } : {}) } };
   });
 
   route('DELETE', '/api/profile/items/:id', async ({ user, params }) => {
     user.shared.items = user.shared.items.filter((i) => i.id !== params.id);
     return { body: { ok: true } };
+  });
+
+  route('PUT', '/api/profile/openers', async ({ user, body }) => {
+    const list = Array.isArray(body.openers) ? body.openers : [];
+    const out = [];
+    for (const raw of list) {
+      const text = cleanText(raw, 120);
+      if (!text || out.includes(text)) continue;
+      if (hasContactInfo(text)) throw new HttpError(400, NO_CONTACT);
+      if (isAbusive(text)) throw new HttpError(422, 'Please keep it kind.');
+      out.push(text);
+    }
+    if (out.length > MAX_OPENERS) throw new HttpError(400, `Up to ${MAX_OPENERS} questions.`);
+    user.shared.openers = out;
+    return { body: { openers: out } };
   });
 
   route('PUT', '/api/profile/bio', async ({ user, body }) => {

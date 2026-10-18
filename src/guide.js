@@ -44,6 +44,7 @@ export function sharedSteps(user) {
     { id: 'lines', label: 'Three lines in your own voice', done: approved(user) >= 3, action: { href: '#/profile/lines', label: waiting ? 'Review suggestions' : 'Add a line' } },
     { id: 'review', label: 'Nothing waiting for your approval', done: waiting === 0, action: { href: '#/profile/lines', label: `Review ${waiting} suggestion${waiting === 1 ? '' : 's'}` } },
     { id: 'facts', label: 'A few facts: work, languages, kids and so on', done: shownFacts(user) >= 3, action: { href: '#/profile/facts', label: 'Add facts' } },
+    { id: 'openers', label: 'An opening question for your matches', done: (s.openers || []).length > 0, action: { href: '#/profile/openers', label: 'Add a question' } },
     { id: 'interests', label: 'Three interests', done: s.interests.length >= 3, action: { ...EDIT, href: '#/profile/interests', label: s.suggestedInterests?.length ? 'Look at suggested interests' : 'Add interests' } },
   ];
 }

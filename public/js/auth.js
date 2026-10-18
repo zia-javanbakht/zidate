@@ -135,7 +135,12 @@ export function about() {
     p('The hidden profile is how I choose people for you: personality, values, dealbreakers and what you want in a partner. Only you can see it, under You, and you can correct anything that is wrong.'),
     p('I also learn from what you do: who you like and pass on, how conversations with matches go, and when you are usually around. These signals are only used to choose people for you. They are not shown in the app, and they are included when you download your data.'),
     h('h2', {}, 'Two people a week'),
-    p('Every Monday you get two suggestions, people near you first, and only as far away as you are both happy to go. Like or pass, and tell me why: it makes the next pair better. When you both like each other, you can talk.'),
+    p('Every week, on the day you choose, you get two suggestions, people near you first, and only as far away as you are both happy to go. Like or pass, and tell me why: it makes the next pair better. You can like one line or photo and add a note; they see it on your card. When you both like each other, you can talk.'),
+    h('h2', {}, 'No one left waiting'),
+    p('If someone has been waiting a couple of days for your reply, your next two wait too, until you answer or close that conversation kindly. Closing sends one polite last message, so nobody is left wondering.'),
+    h('h2', {}, 'After you meet'),
+    p('A week after you match, I ask whether you met and whether you would see them again. Only I see your answer. It teaches me what works for you in person, and, counted across everyone who met someone, nudges who I suggest. What you said about someone is deleted with your account.'),
     h('h2', {}, 'Privacy and safety'),
+    p('Before a date, you can share who you are meeting, where and when with someone you trust. Afterwards I ask if you are home safe, and email them if I do not hear from you. Pishi never knows where you are and does not call emergency services.'),
     p('Photos can stay hidden until you match. Messages that look abusive are not sent. You can report or unmatch anyone, pause whenever you like, download all your data, and delete your account at any time. Deleting removes everything, including photos and conversations.')));
 }

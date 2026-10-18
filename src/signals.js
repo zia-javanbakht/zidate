@@ -33,6 +33,10 @@ function blank() {
     // How other people react when this person is suggested to them.
     received: { shown: 0, liked: 0 },
     matches: { started: 0, replied: 0, firstMessages: 0, ghosted: 0, replyMin: 0, timed: 0 },
+    // "Did you meet?": this person's answers, by the other person's id...
+    dates: {},
+    // ...and what people who met this person answered about them (answer, reason).
+    dateReviews: {},
     observations: [],
   };
 }
@@ -256,6 +260,7 @@ export function summarizeSignals(sig) {
     averageHoursToDecide: d.timed ? Math.round(mean(d.decideSec, d.timed) / 360) / 10 : null,
     revealedPreferences: revealedPreferences(sig),
     responsiveness: responsiveness(sig),
+    meetings: Object.values(sig.dates || {}),
     activeHoursUtc: sig.activeHours,
     observations: sig.observations.map((o) => o.text),
   };

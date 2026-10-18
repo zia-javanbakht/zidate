@@ -138,6 +138,7 @@ export function upgradeUser(user) {
   upgradeHidden(user.hidden);
   user.shared.facts ||= {};
   user.shared.suggestedInterests ||= [];
+  user.shared.openers ||= [];
   return user;
 }
 
@@ -249,6 +250,7 @@ export function publicProfile(user, { showPhotos = false } = {}) {
     interests: user.shared.interests,
     facts: FACT_KEYS.filter((k) => user.shared.facts?.[k]?.status === 'approved').map((k) => ({ key: k, label: FACTS[k].label, value: user.shared.facts[k].value })),
     items: user.shared.items.filter((i) => i.status === 'approved').map(({ prompt, text }) => ({ prompt, text })),
+    openers: user.shared.openers || [],
     photos: showPhotos ? photos.map((p) => `/api/photos/${p.id}`) : [],
     photosHidden: !showPhotos && photos.length > 0,
     ...(user.demo ? { demo: true } : {}),
