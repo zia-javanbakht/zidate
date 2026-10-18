@@ -1,3 +1,5 @@
+import { emptyTemperament, TEMPERAMENT_KEYS } from './temperament.js';
+
 // The hidden profile is a set of traits on a 0..1 scale, each with a confidence.
 // Labels describe the two poles so both the agent and the UI can explain a value.
 
@@ -102,6 +104,9 @@ export function emptyHidden() {
     // Learned from how the person reacts to suggestions: per-trait pull toward
     // what they actually liked, separate from who they are.
     preference: {},
+    // The four temperaments from the hidden questionnaire (see temperament.js).
+    // Unlike the traits, never shown to the person.
+    temperament: emptyTemperament(),
   };
 }
 
@@ -114,5 +119,6 @@ export function upgradeHidden(hidden) {
   const fresh = emptyHidden();
   for (const k of TRAIT_KEYS) hidden.traits[k] ||= fresh.traits[k];
   for (const [k, v] of Object.entries(fresh)) hidden[k] ??= v;
+  for (const k of TEMPERAMENT_KEYS) hidden.temperament[k] ||= fresh.temperament[k];
   return hidden;
 }

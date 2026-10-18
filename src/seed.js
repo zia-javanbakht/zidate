@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url';
 import { TRAIT_KEYS, CORE_TRAITS, INTERESTS, ASPECTS, FACTS, clamp01 } from './traits.js';
 import { newUser } from './app.js';
+import { TEMPERAMENT_KEYS } from './temperament.js';
 
 const WOMEN = ['Maya', 'Leila', 'Sofia', 'Hannah', 'Amara', 'Chloe', 'Ines', 'Nadia', 'Freya', 'Yuki', 'Priya', 'Elena', 'Zara', 'Grace', 'Noor', 'Clara', 'Ava', 'Mina', 'Lucia', 'Ruth'];
 const MEN = ['Sam', 'Omar', 'Daniel', 'Kai', 'Theo', 'Ravi', 'Lucas', 'Ben', 'Mateo', 'Jonah', 'Arjun', 'Felix', 'Hugo', 'Idris', 'Leo', 'Marcus', 'Nico', 'Owen', 'Tomas', 'Yusuf'];
@@ -37,6 +38,7 @@ export function seedDemo(store, { count = 64, seed = 7 } = {}) {
   // Newer profile parts draw from their own sequence, so the original demo people stay the same.
   const r2 = rng(seed + 1);
   const pick2 = (arr) => arr[Math.floor(r2() * arr.length)];
+  const r3 = rng(seed + 2);
   let made = 0;
   for (let i = 0; i < count; i++) {
     const roll = r();
@@ -51,6 +53,7 @@ export function seedDemo(store, { count = 64, seed = 7 } = {}) {
       distance: ['any', 'hours', null, 'near', 'any', null][Math.floor(i / DEMO_CITIES.length) % 6] };
     for (const k of CORE_TRAITS) user.hidden.traits[k] = { value: clamp01(Math.round(r() * 100) / 100), confidence: 0.5 + Math.round(r() * 30) / 100 };
     for (const k of TRAIT_KEYS.filter((t) => !CORE_TRAITS.includes(t))) user.hidden.traits[k] = { value: clamp01(Math.round(r2() * 100) / 100), confidence: 0.3 + Math.round(r2() * 30) / 100 };
+    for (const k of TEMPERAMENT_KEYS) user.hidden.temperament[k] = { value: Math.round(r3() * 100) / 100, confidence: 0.4 + Math.round(r3() * 30) / 100 };
     user.hidden.aspects = { loveLanguage: pick2(Object.keys(ASPECTS.loveLanguage)), pace: pick2(Object.keys(ASPECTS.pace)) };
     const fam = user.hidden.traits.family.value;
     user.hidden.tags = [fam > 0.7 ? 'wants-kids' : fam < 0.3 ? 'no-kids' : null, r() < 0.15 ? 'smoker' : 'non-smoker', r() < 0.25 ? 'sober' : 'drinks', r() < 0.3 ? 'pets' : null].filter(Boolean);

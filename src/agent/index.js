@@ -7,6 +7,7 @@ import { applyUpdate, completeness, isReady, basicsDone, cleanText } from '../pr
 import { now } from '../clock.js';
 import { profileGuide } from '../guide.js';
 import { normalizeCity } from '../cities.js';
+import { TEMPERAMENT_ITEMS, ITEM_CONFIDENCE } from '../temperament.js';
 
 export function pickEngine() {
   if (process.env.PISHI_AGENT === 'offline') return mockEngine;
@@ -78,6 +79,20 @@ function questionScore(q, user, answeredSelf, lastHadChoices) {
   return need + rhythm + (q.share ? 0.1 : 0);
 }
 
+// The hidden questionnaire is woven into the interview once matching has started, so it
+// never delays the first picks: every other question until it is done, always about the
+// temperament we know least. When the interview runs out, it fills the gap on its own.
+function temperamentQuestion(user, convo, interviewLeft, lastHadChoices) {
+  const open = TEMPERAMENT_ITEMS.filter((q) => !convo.asked.includes(q.id));
+  if (!open.length || !isReady(user)) return null;
+  // They are quick replies, so they keep the rhythm: only straight after a question worth typing.
+  if (interviewLeft && lastHadChoices) return null;
+  const t = user.hidden.temperament;
+  const need = (q) => q.choices.reduce((n, c) => n + Object.keys(c.temper).reduce((m, k) => m + (1 - t[k].confidence), 0), 0) / q.choices.length;
+  const q = open.map((item) => [item, need(item)]).sort((x, y) => y[1] - x[1])[0][0];
+  return { ...q, mode: 'self', traits: [], kind: 'interview' };
+}
+
 // What should the interviewer ask next?
 export function nextQuestion(user, convo) {
   const basic = BASICS.find((b) => user.basics[b.key] == null);
@@ -87,17 +102,20 @@ export function nextQuestion(user, convo) {
     if (fb) return { ...fb, kind: 'feedback' };
   }
   const answeredSelf = convo.asked.filter((id) => QUESTIONS.find((q) => q.id === id)?.mode === 'self').length;
-  const lastId = [...convo.asked].reverse().find((id) => QUESTIONS.some((q) => q.id === id) || DEEPER.some((q) => q.id === id));
-  const lastHadChoices = Boolean([...QUESTIONS, ...DEEPER].find((q) => q.id === lastId)?.choices);
+  const bank = [...QUESTIONS, ...DEEPER, ...TEMPERAMENT_ITEMS];
+  const lastId = [...convo.asked].reverse().find((id) => bank.some((q) => q.id === id));
+  const lastHadChoices = Boolean(bank.find((q) => q.id === lastId)?.choices);
   const open = QUESTIONS.filter((q) => !convo.asked.includes(q.id) && !q.skipIf?.(user))
     .map((q) => [q, questionScore(q, user, answeredSelf, lastHadChoices)])
     .filter(([, s]) => s >= 0)
     .sort((a, b) => b[1] - a[1]);
-  if (open.length) return { ...open[0][0], kind: 'interview' };
-  // Core interview done: go deeper where we know least.
   const deeper = DEEPER.filter((q) => !convo.asked.includes(q.id))
     .map((q) => [q, questionScore(q, user, answeredSelf, lastHadChoices)])
     .sort((a, b) => b[1] - a[1]);
+  const temper = temperamentQuestion(user, convo, open.length + deeper.length > 0, lastHadChoices);
+  if (temper) return temper;
+  if (open.length) return { ...open[0][0], kind: 'interview' };
+  // Core interview done: go deeper where we know least.
   if (deeper.length) return { ...deeper[0][0], kind: 'interview' };
   return { id: 'q_open', kind: 'open', mode: 'self', text: 'Is there anything else you would like me to know about you, or about who you hope to meet?' };
 }
@@ -167,6 +185,7 @@ export async function respond(user, convo, rawText, engine = pickEngine(), signa
     applyUpdate(user, {
       traitUpdates: Object.entries(choice.set || {}).map(([trait, value]) => ({ trait, value, confidence: 0.55 })),
       preferenceUpdates: choice.prefer || [],
+      temperamentUpdates: Object.entries(choice.temper || {}).map(([scale, value]) => ({ scale, value, confidence: ITEM_CONFIDENCE })),
       tags: choice.tags || [],
       aspects: choice.aspects,
       facts: choice.facts,
