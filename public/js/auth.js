@@ -142,5 +142,5 @@ export function about() {
     p('A week after you match, I ask whether you met and whether you would see them again. Only I see your answer. It teaches me what works for you in person, and, counted across everyone who met someone, nudges who I suggest. What you said about someone is deleted with your account.'),
     h('h2', {}, 'Privacy and safety'),
     p('Before a date, you can share who you are meeting, where and when with someone you trust. Afterwards I ask if you are home safe, and email them if I do not hear from you. Pishi never knows where you are and does not call emergency services.'),
-    p('Photos can stay hidden until you match. Messages that look abusive are not sent. You can report or unmatch anyone, pause whenever you like, download all your data, and delete your account at any time. Deleting removes everything, including photos and conversations.')));
+    p('Photos can stay hidden until you match. Messages that look abusive are not sent. You can report or unmatch anyone, pause whenever you like, download all your data, and delete your account at any time. Photo verification compares a selfie in a random pose with your photos (by Claude, or by a moderator when the check is unsure); the selfie is never shown on your profile. Deleting removes everything, including photos, your verification selfie and conversations.')));
 }

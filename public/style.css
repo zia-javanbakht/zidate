@@ -348,3 +348,15 @@ blockquote.about img { width: 120px; aspect-ratio: 4 / 5; object-fit: cover; bor
 .openers { margin-top: 14px; }
 .openers .prompt { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .openers ul, ul.plain { margin: 4px 0 0; padding-left: 18px; }
+/* Photo verification */
+.verified { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; margin-left: 10px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); font-family: var(--sans); font-size: .75rem; font-weight: 600; letter-spacing: .02em; }
+.verified::before { content: "✓"; }
+.section-head .verified { margin-left: 0; }
+.verify .pose { display: grid; gap: 2px; }
+.verify .pose strong { font-size: 1.15rem; }
+.selfie-live, .selfie-shot { width: 100%; max-width: 300px; aspect-ratio: 3 / 4; object-fit: cover; border-radius: var(--radius); background: var(--line); }
+.selfie-live { transform: scaleX(-1); }
+.verify-compare { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+.verify-compare figure { margin: 0; display: grid; gap: 4px; }
+.verify-compare img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 8px; background: var(--line); }
+.verify-compare figure:first-child img { outline: 2px solid var(--accent); }

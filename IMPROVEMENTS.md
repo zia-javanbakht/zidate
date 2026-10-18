@@ -160,3 +160,8 @@ Asked for: analyse the app, suggest what is missing compared with the five apps 
 | 113 | 22 | Guide | The profile guide and the matchmaker's nudges suggest an opening question; the About page covers likes with notes, your turn, after you meet and Share Date. | Unit tests |
 | 114 | 23 | Review | Browser test of the whole flow at phone size (likes with a note, quote, opener, Share Date, home safe, did you meet, closing kindly, trusted contact, opening questions). It found that opening questions disappeared once a note had opened the conversation; they now show until you have written yourself. | Browser test |
 
+## Photo verification (115)
+
+| # | Area | What changed | Verified by |
+|---|---|---|---|
+| 115 | Safety | Photo verification with a Verified badge. On the You page, people take a live selfie (camera in the browser, or the phone camera as a fallback) in a pose picked at random, such as "Cover one eye with your hand". With an API key, Claude compares it with their photos and checks it is a live photo in the right pose: a clear match verifies at once, a wrong pose or a photo of a screen asks for another try, a mismatch can go to a moderator, and anything unsure goes to the moderators' new queue (selfie next to the profile photos, Same person or Does not match). Without a key a moderator checks every selfie. The badge shows on the profile card only while every photo has been checked; a new photo is compared with the stored selfie the same way. The selfie is never shown on the profile, is in the data export as a status only, and is deleted with the verification or the account. Five tries a day. | API and unit tests; browser test with a fake camera |

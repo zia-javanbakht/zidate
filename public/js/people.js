@@ -81,7 +81,7 @@ export function personCard(p, { onDecide, onReport } = {}) {
   const card = h('article', { class: 'card person' },
     pics,
     open && pics ? h('p', { class: 'like-photo' }, h('button', { class: 'link small', type: 'button', onclick: () => likePart({ kind: 'photo', index: pics.current() }, 'photo') }, '♥ Like this photo')) : null,
-    h('h2', {}, p.name),
+    h('h2', {}, p.name, p.verified ? h('span', { class: 'verified', title: 'Their selfie matched their photos' }, 'Verified') : null),
     h('p', { class: 'meta' }, [p.age, p.city, p.demo ? 'demo profile' : null].filter(Boolean).join(' · ')),
     p.photosHidden ? h('p', { class: 'hint' }, `${p.name} shares photos after you match.`) : null,
     p.bio ? h('p', { class: 'bio' }, p.bio) : null,

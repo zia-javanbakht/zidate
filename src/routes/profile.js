@@ -6,6 +6,7 @@ import { INTERESTS, TAGS, FACTS, FACT_KEYS } from '../traits.js';
 import { decodeUpload, mimeFor, MAX_PHOTOS } from '../photos.js';
 import { matchId, currentWeek } from '../matching.js';
 import { profileGuide } from '../guide.js';
+import { verificationView } from '../verification.js';
 import { isAbusive } from '../moderation.js';
 import { lineFeedback } from '../feedback.js';
 
@@ -29,7 +30,7 @@ export const OPENERS = [
 ];
 export const MAX_OPENERS = 3;
 
-export default function profile({ store, route, HttpError, meView, photos, serial }) {
+export default function profile({ store, route, HttpError, meView, photos, serial, onPhotoAdded }) {
   route('GET', '/api/profile', async ({ user }) => ({
     body: {
       shared: user.shared,
@@ -37,6 +38,7 @@ export default function profile({ store, route, HttpError, meView, photos, seria
       preview: publicProfile(user, { showPhotos: true }),
       hidden: describeHidden(user),
       guide: profileGuide(user),
+      verification: verificationView(user),
       // Tips on the lines the person wrote themselves (the matchmaker's are already shaped).
       feedback: Object.fromEntries(user.shared.items.filter((i) => i.own).map((i) => [i.id, lineFeedback(i.prompt, i.text)])),
       prompts: PROMPTS,
@@ -229,6 +231,7 @@ export default function profile({ store, route, HttpError, meView, photos, seria
     if (error) throw new HttpError(400, error);
     const id = photos.save(buf, type);
     user.photos.push({ id, at: new Date().toISOString() });
+    onPhotoAdded(user, id);
     return { status: 201, body: { photo: { id, url: `/api/photos/${id}` } } };
   }, { bodyLimit: 4.5 * 1024 * 1024 });
 
