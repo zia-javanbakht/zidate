@@ -307,6 +307,29 @@ export async function thread(id) {
     location.hash = '#/matches';
   });
 
+  // "Did you meet?" any time, not only when the matchmaker asks a week on.
+  const MET = { again: 'We met, and I want to see them again', once: 'We met, but once was enough', talking: 'We are talking, not met yet', quiet: 'We did not really talk' };
+  const metBtn = h('button', { class: 'link small', type: 'button' }, data.met ? `You said: ${MET[data.met].toLowerCase()}` : 'Did you meet?');
+  metBtn.onclick = async () => {
+    const v = await ask({
+      title: `Did you meet ${name}?`,
+      text: 'Only your matchmaker sees this. It helps me pick better people for you.',
+      fields: [{ name: 'answer', label: 'How it went', type: 'select', value: data.met || 'again', options: Object.entries(MET) }],
+    });
+    if (!v) return;
+    try {
+      const res = await api('POST', `/api/matches/${encodeURIComponent(id)}/met`, v);
+      data.met = res.met;
+      metBtn.textContent = `You said: ${MET[res.met].toLowerCase()}`;
+      if (res.ask) {
+        toast('Thank you. Your matchmaker has one quick question.');
+        location.hash = '#/talk';
+      } else toast('Thank you, noted.');
+    } catch (ex) {
+      toast(ex.message);
+    }
+  };
+
   const unmatch = h('button', { class: 'link small', type: 'button' }, 'Unmatch or report');
   unmatch.onclick = async () => {
     const v = await ask({
@@ -326,7 +349,7 @@ export async function thread(id) {
     location.hash = '#/matches';
   };
   render(h('section', { class: 'chat' },
-    h('div', { class: 'section-head' }, h('a', { class: 'back', href: '#/matches' }, '← Matches'), unmatch),
+    h('div', { class: 'section-head' }, h('a', { class: 'back', href: '#/matches' }, '← Matches'), h('div', { class: 'row wrap' }, metBtn, unmatch)),
     personCard(data.person), log, ice, form));
   window.scrollTo(0, document.body.scrollHeight);
 }

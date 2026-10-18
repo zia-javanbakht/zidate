@@ -4,6 +4,7 @@ import { basicsDone } from './profile.js';
 import { isReady, publicProfile, settingsOf } from './profile.js';
 import { distanceKm, NEARBY_KM, FEW_HOURS_KM } from './cities.js';
 import { weekKey, nextWeekStart, now } from './clock.js';
+import { dateRating, photoMismatches } from './dates.js';
 import { revealedPreferences, likeChance, responsiveness, popularity, hoursOverlap, noteShown, reportCounts } from './signals.js';
 
 export const PER_WEEK = 2;
@@ -165,6 +166,11 @@ export function signalBoost(store, a, b, reports = reportCounts(store)) {
   boost -= Math.min(0.15, (reports.get(b.id) || 0) * 0.05);
   // Spread attention: someone almost everyone likes does not need to be in every pair.
   boost -= (popularity(sb) - 0.5) * 0.06;
+  // How meeting b in person went for others: wanted again lifts a little, and "did not look
+  // like their photos" counts against them. Counted across people, never one review alone.
+  const rating = dateRating(sb);
+  if (rating != null) boost += (rating - 0.5) * 0.1;
+  boost -= Math.min(0.12, Math.max(0, photoMismatches(sb) - 1) * 0.04);
   const hours = hoursOverlap(sa, sb);
   if (hours != null) boost += (hours - 0.5) * 0.04;
   return boost;
