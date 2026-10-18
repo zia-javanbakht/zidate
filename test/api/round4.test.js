@@ -268,3 +268,22 @@ test('share date: only your own plans, and cancelling tells the contact', async 
   assert.equal((await a.get('/api/me')).data.user.settings.trustedContact, undefined);
   await s.close();
 });
+
+test('share date review: "home safe" survives an unmatch, and a long-past date never alarms anyone', async () => {
+  const { s, a, A, mid } = await matched();
+  s.store.data.users[A.id].emailVerified = true;
+  await a.put('/api/settings', { trustedContact: { name: 'Sara', email: 'sara@friend.co' } });
+  await a.post(`/api/matches/${mid}/date`, { when: new Date(Date.now() + 3600e3).toISOString(), place: 'The park' });
+  await a.post(`/api/matches/${mid}/unmatch`, {});
+  const { dates } = (await a.get('/api/dates')).data;
+  assert.equal(dates.length, 1);
+  assert.equal(dates[0].with, 'Ben');
+  assert.equal(dates[0].matchId, null);
+  // The server was down for three days: no late alarm.
+  clock.advance(3 * 864e5);
+  tick(s.store, s.ctx);
+  assert.ok(!s.mailer.sent.some((m) => /have not heard/.test(m.subject)));
+  assert.equal((await a.get('/api/dates')).data.dates.length, 0);
+  clock.reset();
+  await s.close();
+});

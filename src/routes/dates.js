@@ -1,7 +1,7 @@
 // Share Date: plans for meeting a match, sent to a trusted contact, and the safety check after.
 import { cleanText, settingsOf } from '../profile.js';
 import { now } from '../clock.js';
-import { activePlan, datesOf, planView, shareMail, safeMail, cancelMail, SHARES_PER_DAY } from '../safety.js';
+import { activePlan, datesOf, openPlans, planView, shareMail, safeMail, cancelMail, SHARES_PER_DAY } from '../safety.js';
 
 const DAY = 864e5;
 
@@ -41,6 +41,8 @@ export default function dates(ctx) {
     await shareMail(ctx, user, other, d, { update });
     return { status: update ? 200 : 201, body: { date: planView(d, settingsOf(user).timeZone) } };
   });
+
+  route('GET', '/api/dates', async ({ user }) => ({ body: { dates: openPlans(store, user.id).map((d) => planView(d, settingsOf(user).timeZone, store)) } }));
 
   route('POST', '/api/dates/:id/safe', async ({ user, params }) => {
     const d = ownPlan(user, params.id);

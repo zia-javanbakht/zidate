@@ -25,8 +25,15 @@ export function activePlan(store, userId, matchId) {
   return datesOf(store, userId).find((d) => d.matchId === matchId && (d.status === 'shared' || d.status === 'alerted')) || null;
 }
 
-export function planView(d, tz) {
-  return { id: d.id, when: d.when, whenText: formatWhen(d.when, tz), place: d.place, contact: d.contact.name, status: d.status };
+export function planView(d, tz, store = null) {
+  const other = store?.data.users[d.withId];
+  return { id: d.id, when: d.when, whenText: formatWhen(d.when, tz), place: d.place, contact: d.contact.name, status: d.status, ...(store ? { with: other?.name || 'your match', matchId: store.data.matches[d.matchId] ? d.matchId : null } : {}) };
+}
+
+// Plans still waiting for "home safe", whether or not the match still exists: unmatching
+// someone mid-date must not hide the button.
+export function openPlans(store, userId) {
+  return datesOf(store, userId).filter((d) => d.status === 'shared' || d.status === 'alerted').sort((a, b) => a.when.localeCompare(b.when));
 }
 
 function mailContact(ctx, user, plan, subject, body) {
@@ -66,9 +73,14 @@ export function runDates(ctx) {
     const user = store.data.users[d.userId];
     if (!user) continue;
     const start = Date.parse(d.when);
+    // If Pishi was down for days, a "have not heard" email about an old date only alarms people.
+    if (t > start + 48 * HOUR) {
+      d.status = 'expired';
+      continue;
+    }
     if (!d.askedAt && t >= start + ASK_AFTER_H * HOUR) {
       d.askedAt = now().toISOString();
-      notify(user, { type: 'safety', text: `Are you home safe? Tap to let ${d.contact.name} know.`, link: `#/match/${encodeURIComponent(d.matchId)}` });
+      notify(user, { type: 'safety', text: `Are you home safe? Tap to let ${d.contact.name} know.`, link: '#/matches' });
       n++;
     }
     if (t >= start + ALERT_AFTER_H * HOUR) {

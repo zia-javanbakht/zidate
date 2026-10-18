@@ -226,15 +226,24 @@ function avatar(person) {
 }
 
 export async function matches() {
-  const { matches: list } = await api('GET', '/api/matches');
+  const [{ matches: list }, { dates }] = await Promise.all([api('GET', '/api/matches'), api('GET', '/api/dates')]);
+  // Shared date plans waiting for "I am home safe", even if that match has ended.
+  const plans = dates.map((d) => h('div', { class: 'banner plan' },
+    h('span', {}, `Your date with ${d.with}: ${d.whenText}, ${d.place}.`),
+    h('button', { class: 'btn small', type: 'button', onclick: async (e) => {
+      e.target.disabled = true;
+      await api('POST', `/api/dates/${encodeURIComponent(d.id)}/safe`);
+      toast(`Thank you. I have told ${d.contact}.`);
+      matches();
+    } }, 'I am home safe')));
   if (!list.length) {
-    render(empty(
+    render(...plans, empty(
       h('h2', {}, 'No matches yet.'),
       h('p', { class: 'muted' }, 'When you and someone like each other, you can talk here.'),
       h('a', { class: 'btn ghost', href: '#/week' }, 'See this week')));
     return;
   }
-  render(h('div', { class: 'stack' }, h('h1', {}, 'Matches'),
+  render(h('div', { class: 'stack' }, h('h1', {}, 'Matches'), ...plans,
     h('ul', { class: 'list' }, list.map((m) => h('li', {},
       h('a', { href: `#/match/${encodeURIComponent(m.id)}` },
         h('div', { class: 'who' }, avatar(m.person),
