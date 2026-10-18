@@ -3,6 +3,8 @@ import { publicProfile, cleanText } from '../profile.js';
 import { demoReply, icebreakers, passEvent } from '../social.js';
 import { recordMet, MET } from '../dates.js';
 import { CLOSE_LINES } from '../turns.js';
+import { activePlan, planView } from '../safety.js';
+import { settingsOf } from '../profile.js';
 import { askNow } from '../agent/index.js';
 import { screenMessage } from '../moderation.js';
 import { now } from '../clock.js';
@@ -69,6 +71,8 @@ export default function matches(ctx) {
         met: m.met?.[user.id]?.answer || null,
         closed: m.closed ? { byMe: m.closed.by === user.id, at: m.closed.at } : null,
         closeLines: CLOSE_LINES,
+        date: (() => { const d = activePlan(store, user.id, m.id); return d ? planView(d, settingsOf(user).timeZone) : null; })(),
+        trustedContact: settingsOf(user).trustedContact?.name || null,
       },
     };
   }, { saves: true });

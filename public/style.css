@@ -339,3 +339,4 @@ blockquote.about img { width: 120px; aspect-ratio: 4 / 5; object-fit: cover; bor
 .log .liked.user { align-self: flex-end; text-align: right; }
 .turn { color: var(--accent); font-weight: 600; white-space: nowrap; }
 .closed-note { margin: 4px 0 8px; }
+.banner.plan { flex-wrap: wrap; }

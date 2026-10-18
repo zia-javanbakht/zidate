@@ -20,6 +20,7 @@ import week from './routes/week.js';
 import matches from './routes/matches.js';
 import notifications from './routes/notifications.js';
 import admin from './routes/admin.js';
+import dates from './routes/dates.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(ROOT, 'public');
@@ -137,7 +138,7 @@ export function createApp(store, opts = {}) {
     return n;
   }
 
-  for (const register of [account, chat, profile, week, matches, notifications, admin]) register(ctx);
+  for (const register of [account, chat, profile, week, matches, dates, notifications, admin]) register(ctx);
   route('GET', '/api/health', async () => ({ body: { ok: true, version: VERSION, engine: pickEngine().name, uptime: Math.round(process.uptime()) } }), { auth: false });
 
   function serveStatic(req, res) {

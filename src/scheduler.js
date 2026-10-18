@@ -5,6 +5,7 @@ import path from 'node:path';
 import { runWeekly, runReminders } from './matching.js';
 import { runCheckins } from './social.js';
 import { runNudges } from './turns.js';
+import { runDates } from './safety.js';
 
 export function backup(file, { keep = 7, dir = null } = {}) {
   if (!file || !fs.existsSync(file)) return null;
@@ -21,7 +22,7 @@ export function backup(file, { keep = 7, dir = null } = {}) {
 export function tick(store, ctx) {
   const picks = runWeekly(store, ctx.notify);
   const checkins = runCheckins(ctx);
-  const nudges = runNudges(ctx) + runReminders(store, ctx.notify);
+  const nudges = runNudges(ctx) + runReminders(store, ctx.notify) + runDates(ctx);
   store.pruneSessions();
   if (picks || checkins || nudges) store.save();
   return { picks, checkins, nudges, backup: backup(store.file) };

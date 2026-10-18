@@ -206,3 +206,65 @@ test('the day before a week ends, people who have not decided get one reminder',
   await s.close();
   await t.s.close();
 });
+
+test('share date: plans go to a trusted contact, then "home safe", or an alert when there is no answer', async () => {
+  const { s, a, A, mid } = await matched();
+  const when = new Date(Date.now() + 2 * 864e5).toISOString();
+  const plan = { when, place: 'Coffee at Monmouth, Borough Market' };
+  assert.equal((await a.post(`/api/matches/${mid}/date`, plan)).status, 400, 'needs a contact');
+  assert.equal((await a.put('/api/settings', { trustedContact: { name: 'Sara', email: 'nope' } })).status, 400);
+  assert.equal((await a.put('/api/settings', { trustedContact: { name: 'Sara', email: s.store.data.users[A.id].email } })).status, 400, 'not yourself');
+  assert.equal((await a.put('/api/settings', { trustedContact: { name: 'Sara', email: 'sara@friend.co' } })).status, 200);
+  assert.equal((await a.post(`/api/matches/${mid}/date`, plan)).status, 403, 'needs a confirmed email');
+  s.store.data.users[A.id].emailVerified = true;
+  assert.equal((await a.post(`/api/matches/${mid}/date`, { ...plan, when: new Date(Date.now() + 90 * 864e5).toISOString() })).status, 400);
+  assert.equal((await a.post(`/api/matches/${mid}/date`, { when, place: ' ' })).status, 400);
+  const r = await a.post(`/api/matches/${mid}/date`, plan);
+  assert.equal(r.status, 201);
+  const mail = s.mailer.sent.at(-1);
+  assert.equal(mail.to, 'sara@friend.co');
+  assert.match(mail.text, /Who: Ben, 31, from London/);
+  assert.match(mail.text, /Where: Coffee at Monmouth/);
+  assert.match(mail.text, /does not contact emergency services/);
+  assert.equal((await a.get(`/api/matches/${mid}`)).data.date.place, 'Coffee at Monmouth, Borough Market');
+  // Changing the time updates the same plan.
+  const r2 = await a.post(`/api/matches/${mid}/date`, { ...plan, when: new Date(Date.parse(when) + 3600e3).toISOString() });
+  assert.equal(r2.status, 200);
+  assert.equal(r2.data.date.id, r.data.date.id);
+  assert.match(s.mailer.sent.at(-1).subject, /changed their date plans/);
+  // A third share is fine; a fourth in one day is not.
+  await a.post(`/api/matches/${mid}/date`, plan);
+  assert.equal((await a.post(`/api/matches/${mid}/date`, plan)).status, 429);
+
+  // Three hours after: "are you home safe?"; five hours after: the contact hears.
+  clock.advance(2 * 864e5 + 3.5 * 3600e3);
+  tick(s.store, s.ctx);
+  assert.ok(s.store.data.notifications[A.id].some((n) => /Are you home safe\? Tap to let Sara know/.test(n.text)));
+  assert.ok(!s.mailer.sent.some((m) => /have not heard/.test(m.subject)));
+  clock.advance(2 * 3600e3);
+  tick(s.store, s.ctx);
+  tick(s.store, s.ctx);
+  assert.equal(s.mailer.sent.filter((m) => /have not heard from Ana/.test(m.subject)).length, 1);
+  // Late is still better than never.
+  const safe = await a.post(`/api/dates/${r.data.date.id}/safe`, {});
+  assert.equal(safe.data.date.status, 'safe');
+  assert.match(s.mailer.sent.at(-1).subject, /Ana is home safe/);
+  assert.equal((await a.post(`/api/dates/${r.data.date.id}/cancel`, {})).status, 409);
+  clock.reset();
+  await s.close();
+});
+
+test('share date: only your own plans, and cancelling tells the contact', async () => {
+  const { s, a, b, A, mid } = await matched();
+  s.store.data.users[A.id].emailVerified = true;
+  await a.put('/api/settings', { trustedContact: { name: 'Sara', email: 'sara@friend.co' } });
+  const { date } = (await a.post(`/api/matches/${mid}/date`, { when: new Date(Date.now() + 864e5).toISOString(), place: 'The park' })).data;
+  assert.equal((await b.post(`/api/dates/${date.id}/safe`, {})).status, 404);
+  assert.equal((await b.get(`/api/matches/${mid}`)).data.date, null, 'Ben never sees Ana\'s plans');
+  assert.equal((await a.post(`/api/dates/${date.id}/cancel`, {})).data.date.status, 'cancelled');
+  assert.match(s.mailer.sent.at(-1).subject, /called off/);
+  assert.equal((await a.get(`/api/matches/${mid}`)).data.date, null);
+  await a.put('/api/settings', { trustedContact: null });
+  assert.equal((await a.get('/api/me')).data.user.settings.trustedContact, undefined);
+  await s.close();
+});

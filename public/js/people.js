@@ -361,6 +361,57 @@ export async function thread(id) {
     }
   };
 
+  // Share Date: tell someone you trust who, where and when. Only they and you see it.
+  const local = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  const sharePlan = async () => {
+    const tomorrow = new Date(Date.now() + 864e5);
+    tomorrow.setHours(19, 0, 0, 0);
+    const fields = [
+      { name: 'when', label: 'When', type: 'datetime-local', value: data.date ? local(new Date(data.date.when)) : local(tomorrow) },
+      { name: 'place', label: 'Where', maxlength: 120, value: data.date?.place || '', placeholder: 'For example: Café Nero, Market Street' },
+    ];
+    if (!data.trustedContact) {
+      fields.push({ name: 'contactName', label: 'Trusted contact: first name', maxlength: 40 }, { name: 'contactEmail', label: 'Their email', type: 'email', maxlength: 200 });
+    }
+    const v = await ask({
+      title: data.date ? 'Change your plans' : `Share your plans with ${data.trustedContact || 'someone you trust'}`,
+      text: `I will email them who you are meeting, where and when. After the date I will ask if you are home safe, and tell them if I do not hear from you. ${name} is not told.`,
+      fields,
+      confirm: 'Share plans',
+      validate: (x) => (!x.when ? 'When are you meeting?' : !x.place.trim() ? 'Where are you meeting?' : !data.trustedContact && (!x.contactName.trim() || !x.contactEmail.includes('@')) ? 'Who should I tell?' : ''),
+    });
+    if (!v) return;
+    try {
+      if (!data.trustedContact) {
+        const res = await api('PUT', '/api/settings', { trustedContact: { name: v.contactName, email: v.contactEmail } });
+        setMe(res.user);
+      }
+      const res = await api('POST', `/api/matches/${encodeURIComponent(id)}/date`, { when: new Date(v.when).toISOString(), place: v.place });
+      toast(`Shared with ${res.date.contact}.`);
+      thread(id);
+    } catch (ex) {
+      toast(ex.message);
+    }
+  };
+  const planAction = (path, msg) => async () => {
+    try {
+      await api('POST', `/api/dates/${encodeURIComponent(data.date.id)}/${path}`);
+      toast(msg);
+      thread(id);
+    } catch (ex) {
+      toast(ex.message);
+    }
+  };
+  const plan = data.date
+    ? h('div', { class: 'banner plan' },
+      h('span', {}, `Shared with ${data.date.contact}: ${data.date.whenText}, ${data.date.place}.`),
+      h('div', { class: 'row wrap' },
+        h('button', { class: 'btn small', type: 'button', onclick: planAction('safe', `Thank you. I have told ${data.date.contact}.`) }, 'I am home safe'),
+        h('button', { class: 'link small', type: 'button', onclick: sharePlan }, 'Change'),
+        h('button', { class: 'link small', type: 'button', onclick: planAction('cancel', `Called off. I have told ${data.date.contact}.`) }, 'Call off')))
+    : null;
+  const shareBtn = data.date ? null : h('button', { class: 'link small', type: 'button', onclick: sharePlan }, 'Share date plans');
+
   const unmatch = h('button', { class: 'link small', type: 'button' }, 'Unmatch or report');
   unmatch.onclick = async () => {
     const v = await ask({
@@ -380,7 +431,8 @@ export async function thread(id) {
     location.hash = '#/matches';
   };
   render(h('section', { class: 'chat' },
-    h('div', { class: 'section-head' }, h('a', { class: 'back', href: '#/matches' }, '← Matches'), h('div', { class: 'row wrap' }, metBtn, closeBtn, unmatch)),
+    h('div', { class: 'section-head' }, h('a', { class: 'back', href: '#/matches' }, '← Matches'), h('div', { class: 'row wrap' }, metBtn, shareBtn, closeBtn, unmatch)),
+    plan,
     personCard(data.person), log, data.closed ? null : ice, data.closed ? null : form));
   window.scrollTo(0, document.body.scrollHeight);
 }
