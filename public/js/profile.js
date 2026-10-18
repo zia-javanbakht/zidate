@@ -53,8 +53,13 @@ export async function profile(section = '') {
         h('div', { class: 'tools' },
           i > 0 ? h('button', { type: 'button', 'aria-label': `Make photo ${i + 1} your main photo`, onclick: act(async () => { await api('POST', `/api/photos/${p.id}/main`); reload(); }) }, 'Main') : h('span'),
           h('button', { type: 'button', 'aria-label': `Remove photo ${i + 1}`, onclick: act(async () => { await api('DELETE', `/api/photos/${p.id}`); reload(); }) }, '×')))),
-      photos.length < 4 ? h('button', { class: 'photo add', type: 'button', onclick: () => file.click() }, '+ Add photo') : null),
+      photos.length < 4 ? h('button', { class: 'photo add', type: 'button', onclick: () => file.click() }, '+ Add photo') : null,
+      // Empty slots up to three, so the suggested minimum is visible at a glance.
+      Array.from({ length: Math.max(0, 2 - photos.length) }, () => h('div', { class: 'photo ghost', 'aria-hidden': 'true', onclick: () => file.click() }))),
     file,
+    photos.length < 3 ? h('p', { class: 'nudge small' }, photos.length
+      ? `Add ${3 - photos.length} more to reach three. A few different photos, like a clear face shot, one doing something you love and one full-length, get far more replies than one.`
+      : 'Add at least three photos: a clear face shot, one doing something you love and one full-length.') : null,
     h('p', { class: 'hint' }, me.settings.photosAfterMatch ? 'Photos are shown only to people you match with. You can change this in Settings.' : 'Your two weekly suggestions can see your photos.'));
 
   // --- shared profile ---

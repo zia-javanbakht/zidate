@@ -202,7 +202,9 @@ export async function respond(user, convo, rawText, engine = pickEngine(), signa
 // on the profiles. Never more than once every six answers, never the same step twice in a row.
 const NUDGE_EVERY = 6;
 const NUDGES = {
-  photo: 'People are far more likely to say yes when they can see you. Add a photo when you have a moment.',
+  photo: (user) => ((user.photos || []).length
+    ? 'One or two photos is a start. Three, like a face shot, one doing something you love and one full-length, give people a much better sense of you.'
+    : 'People are far more likely to say yes when they can see you. Add three photos when you have a moment.'),
   bio: 'You do not have a bio yet. Two sentences are enough, and I have drafted one you can use.',
   lines: 'Your shared profile is a bit quiet. A few lines in your own words give your matches something to reply to.',
   review: 'I have suggested some lines for your shared profile. They only appear once you approve them.',
@@ -220,7 +222,7 @@ function guideNudge(user, convo) {
   if (!step) return;
   convo.flags.sinceNudge = 0;
   convo.flags.lastNudge = step.id;
-  convo.messages.push({ role: 'agent', notice: 'guide', text: NUDGES[step.id], link: step.action.href, label: step.action.label, at: now().toISOString() });
+  convo.messages.push({ role: 'agent', notice: 'guide', text: typeof NUDGES[step.id] === 'function' ? NUDGES[step.id](user) : NUDGES[step.id], link: step.action.href, label: step.action.label, at: now().toISOString() });
 }
 
 // After a day or more away, greet the person and repeat where we were.

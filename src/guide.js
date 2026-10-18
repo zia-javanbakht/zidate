@@ -3,6 +3,8 @@
 import { TRAIT_KEYS, CORE_TRAITS } from './traits.js';
 import { basicsDone, completeness, READY } from './profile.js';
 
+// Not enforced: people can match with one photo, but three is what the guide asks for.
+export const MIN_PHOTOS = 3;
 const DEEPER_TRAITS = TRAIT_KEYS.filter((k) => !CORE_TRAITS.includes(k));
 const TALK = { href: '#/talk', label: 'Talk to your matchmaker' };
 const EDIT = { href: '#/profile', label: 'Edit your profile' };
@@ -34,9 +36,10 @@ export function hiddenSteps(user) {
 
 export function sharedSteps(user) {
   const s = user.shared;
+  const photos = (user.photos || []).length;
   const waiting = s.items.filter((i) => i.status === 'suggested').length + Object.values(s.facts || {}).filter((f) => f.status === 'suggested').length + (s.suggestedInterests?.length ? 1 : 0);
   return [
-    { id: 'photo', label: 'A photo', done: (user.photos || []).length > 0, action: { href: '#/profile/photos', label: 'Add a photo' } },
+    { id: 'photo', label: photos ? `At least three photos (you have ${photos})` : 'At least three photos', done: photos >= MIN_PHOTOS, action: { href: '#/profile/photos', label: photos ? `Add ${MIN_PHOTOS - photos} more` : 'Add photos' } },
     { id: 'bio', label: 'A short bio', done: Boolean(s.bio), action: { href: '#/profile/bio', label: s.bioDraft ? 'Look at your suggested bio' : 'Write a bio' } },
     { id: 'lines', label: 'Three lines in your own voice', done: approved(user) >= 3, action: { href: '#/profile/lines', label: waiting ? 'Review suggestions' : 'Add a line' } },
     { id: 'review', label: 'Nothing waiting for your approval', done: waiting === 0, action: { href: '#/profile/lines', label: `Review ${waiting} suggestion${waiting === 1 ? '' : 's'}` } },
