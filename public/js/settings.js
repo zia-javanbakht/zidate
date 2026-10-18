@@ -61,7 +61,7 @@ export async function settings() {
 
   const emails = h('section', { class: 'card' },
     h('h2', {}, 'Emails'),
-    h('p', { class: 'hint' }, 'Only sent when you do not have ziDate open.'),
+    h('p', { class: 'hint' }, 'Only sent when you do not have Pishi open.'),
     ...[['picks', 'New weekly suggestions'], ['match', 'A new match'], ['message', 'A new message']].map(([k, label]) =>
       toggle(label, null, s.email[k], async (v, el) => {
         if (!(await save({ email: { [k]: v } }))) el.checked = !v;
@@ -144,12 +144,12 @@ export async function settings() {
       h('div', { class: 'row wrap' },
         h('button', { class: 'btn small ghost', type: 'button', onclick: changePassword }, 'Change password'),
         h('button', { class: 'btn small ghost', type: 'button', onclick: logoutOthers }, 'Sign out other devices'),
-        h('a', { class: 'btn small ghost', href: '/api/me/export', download: 'zidate-my-data.json' }, 'Download my data'),
+        h('a', { class: 'btn small ghost', href: '/api/me/export', download: 'pishi-my-data.json' }, 'Download my data'),
         me.admin ? h('a', { class: 'btn small ghost', href: '#/admin' }, 'Moderation') : null),
       h('div', { class: 'row spread' },
         h('button', { class: 'btn ghost', type: 'button', onclick: signOut }, 'Sign out'),
         h('button', { class: 'link danger', type: 'button', onclick: del }, 'Delete my account'))),
-    h('p', { class: 'small muted center' }, h('a', { href: '#/about' }, 'How ziDate works'), ` · matchmaker: ${me.engine === 'claude' ? 'Claude' : 'offline'}`)));
+    h('p', { class: 'small muted center' }, h('a', { href: '#/about' }, 'How Pishi works'), ` · matchmaker: ${me.engine === 'claude' ? 'Claude' : 'offline'}`)));
 }
 
 export async function notifications() {

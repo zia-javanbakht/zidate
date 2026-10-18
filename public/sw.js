@@ -1,6 +1,6 @@
 // Minimal offline support: network first for the app shell, cached copy when offline. The API is never cached.
-const CACHE = 'zidate-v2';
-const SHELL = ['/', '/style.css', '/icon.svg', '/manifest.webmanifest', '/js/main.js', '/js/core.js', '/js/auth.js', '/js/talk.js', '/js/people.js', '/js/profile.js', '/js/settings.js'];
+const CACHE = 'pishi-v3';
+const SHELL = ['/', '/style.css', '/favicon.png', '/mark.png', '/logo.png', '/manifest.webmanifest', '/js/main.js', '/js/core.js', '/js/auth.js', '/js/talk.js', '/js/people.js', '/js/profile.js', '/js/settings.js'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

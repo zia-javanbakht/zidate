@@ -27,7 +27,7 @@ export default function admin({ store, route, HttpError, endSessions, mailer }) 
       target.suspended = now().toISOString();
       endSessions(target.id);
       r.status = 'actioned';
-      await mailer.send({ to: target.email, subject: 'Your ziDate account is suspended', text: `Hi ${target.name},\n\nAfter a report, your account has been suspended. If you think this is a mistake, reply to this email.` });
+      await mailer.send({ to: target.email, subject: 'Your Pishi account is suspended', text: `Hi ${target.name},\n\nAfter a report, your account has been suspended. If you think this is a mistake, reply to this email.` });
     } else if (body.action === 'restore') {
       if (!target) throw new HttpError(404, 'That account no longer exists.');
       delete target.suspended;

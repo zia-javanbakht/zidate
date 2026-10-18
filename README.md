@@ -1,4 +1,8 @@
-# ziDate
+# Pishi
+
+<img src="public/logo.png" alt="Pishi logo, a pink cat" width="111">
+
+Pishi means cat in Farsi.
 
 A dating app with no swiping. You talk with an AI matchmaker, it builds two profiles for you, and every Monday it introduces you to two people.
 
@@ -11,19 +15,19 @@ Also: photos (private until a match by default), live messaging with read receip
 
 ## Run it
 
-Needs Node 20 or newer. Or with Docker: `docker build -t zidate . && docker run -p 3000:3000 -v zidate:/data zidate`.
+Needs Node 20 or newer. Or with Docker: `docker build -t pishi . && docker run -p 3000:3000 -v pishi:/data pishi`.
 
 ```sh
 npm install
 npm start            # http://localhost:3000
 ```
 
-On first start it creates 64 demo people (London, Berlin, New York and Toronto), labelled "demo profile", so you can try the whole flow alone. Set `ZIDATE_SEED=0` to skip them.
+On first start it creates 64 demo people (London, Berlin, New York and Toronto), labelled "demo profile", so you can try the whole flow alone. Set `PISHI_SEED=0` to skip them.
 
 ### The matchmaker
 
-- With `ANTHROPIC_API_KEY` set, the matchmaker uses Claude (`claude-opus-5-5` by default, override with `ZIDATE_MODEL`). Claude reads each answer, returns structured updates (traits, preferences, tags, interests, a suggested shared line, a private note, a bio draft) through a strict JSON schema, and phrases the next question.
-- Without a key, or if a Claude call fails, a deterministic offline matchmaker does the same job with a keyword analyser. `ZIDATE_AGENT=offline` forces it.
+- With `ANTHROPIC_API_KEY` set, the matchmaker uses Claude (`claude-opus-5-5` by default, override with `PISHI_MODEL`). Claude reads each answer, returns structured updates (traits, preferences, tags, interests, a suggested shared line, a private note, a bio draft) through a strict JSON schema, and phrases the next question.
+- Without a key, or if a Claude call fails, a deterministic offline matchmaker does the same job with a keyword analyser. `PISHI_AGENT=offline` forces it.
 - Either way, the app (not the model) decides what to ask next, so coverage of every trait, the weekly rhythm and the privacy rules stay predictable.
 
 ### Other settings
@@ -31,14 +35,14 @@ On first start it creates 64 demo people (London, Berlin, New York and Toronto),
 | Variable | Default | Meaning |
 |---|---|---|
 | `PORT` | `3000` | HTTP port |
-| `ZIDATE_DB` | `data/db.json` | Where data is stored (a single JSON file, written atomically) |
-| `ZIDATE_PHOTOS` | `data/photos` | Where uploaded photos are kept |
-| `ZIDATE_OUTBOX` | `data/outbox` | Every outgoing email is also saved here as JSON |
-| `ZIDATE_MAIL_WEBHOOK` | | URL that receives each email as a JSON POST (`from`, `to`, `subject`, `text`), to connect any email service |
-| `ZIDATE_BASE_URL` | `http://localhost:PORT` | Used for links in emails |
+| `PISHI_DB` | `data/db.json` | Where data is stored (a single JSON file, written atomically) |
+| `PISHI_PHOTOS` | `data/photos` | Where uploaded photos are kept |
+| `PISHI_OUTBOX` | `data/outbox` | Every outgoing email is also saved here as JSON |
+| `PISHI_MAIL_WEBHOOK` | | URL that receives each email as a JSON POST (`from`, `to`, `subject`, `text`), to connect any email service |
+| `PISHI_BASE_URL` | `http://localhost:PORT` | Used for links in emails |
 | `ADMIN_EMAILS` | | Comma-separated emails that can open the moderator page (You > Settings > Moderation) |
-| `ZIDATE_SEED` | `1` | `0` skips the demo people |
-| `ZIDATE_LOG` | | `1` logs each request (ids masked) |
+| `PISHI_SEED` | `1` | `0` skips the demo people |
+| `PISHI_LOG` | | `1` logs each request (ids masked) |
 | `NODE_ENV=production` | | Marks the session cookie `Secure` (use behind HTTPS) |
 
 Backups of the data file are written daily next to it (last 7 kept).

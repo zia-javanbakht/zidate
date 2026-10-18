@@ -34,7 +34,7 @@ export function seedDemo(store, { count = 64, seed = 7 } = {}) {
     const name = pick(gender === 'woman' ? WOMEN : gender === 'man' ? MEN : NB);
     const s = r();
     const seeking = gender === 'nonbinary' ? 'everyone' : s < 0.78 ? (gender === 'woman' ? 'men' : 'women') : s < 0.9 ? (gender === 'woman' ? 'women' : 'men') : 'everyone';
-    const user = newUser(store, { name, email: `demo${i}@zidate.local`, password: null });
+    const user = newUser(store, { name, email: `demo${i}@pishi.local`, password: null });
     user.demo = true;
     user.basics = { gender, seeking, age: 22 + Math.floor(r() * 24), city: DEMO_CITIES[i % DEMO_CITIES.length] };
     for (const k of TRAIT_KEYS) user.hidden.traits[k] = { value: clamp01(Math.round(r() * 100) / 100), confidence: 0.5 + Math.round(r() * 30) / 100 };
@@ -57,7 +57,7 @@ export function seedDemo(store, { count = 64, seed = 7 } = {}) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { Store } = await import('./db.js');
-  const store = new Store(process.env.ZIDATE_DB || 'data/db.json');
+  const store = new Store(process.env.PISHI_DB || 'data/db.json');
   console.log(`Seeded ${seedDemo(store)} demo people.`);
   store.flush();
 }

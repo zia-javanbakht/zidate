@@ -23,7 +23,7 @@ test('daily backups, keeping the last seven', () => {
 
 test('config is validated with helpful warnings', () => {
   assert.throws(() => loadConfig({ PORT: 'abc' }), /PORT/);
-  const { cfg, warnings } = loadConfig({ NODE_ENV: 'production', ZIDATE_BASE_URL: 'http://x', ADMIN_EMAILS: 'A@x.co, b@x.co' });
+  const { cfg, warnings } = loadConfig({ NODE_ENV: 'production', PISHI_BASE_URL: 'http://x', ADMIN_EMAILS: 'A@x.co, b@x.co' });
   assert.deepEqual(cfg.admins, ['a@x.co', 'b@x.co']);
   assert.ok(warnings.some((w) => w.includes('https')));
 });

@@ -6,7 +6,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { TRAITS, TRAIT_KEYS, TAGS, INTERESTS } from '../traits.js';
 import { describeHidden } from '../profile.js';
 
-const MODEL = process.env.ZIDATE_MODEL || 'claude-opus-5-5';
+const MODEL = process.env.PISHI_MODEL || 'claude-opus-5-5';
 
 const traitUpdate = {
   type: 'object',
@@ -57,7 +57,7 @@ export const SCHEMA = {
   },
 };
 
-const SYSTEM = `You are the interviewer inside ziDate, a dating app with no swiping. You get to know one person through conversation and keep two profiles for them:
+const SYSTEM = `You are the interviewer inside Pishi, a dating app with no swiping. You get to know one person through conversation and keep two profiles for them:
 - a HIDDEN profile used only for matching (traits, tags, dealbreakers, preferences, private notes). Nobody else ever sees it.
 - a SHARED profile that potential matches see. You may only suggest lines for it; the person approves each one.
 

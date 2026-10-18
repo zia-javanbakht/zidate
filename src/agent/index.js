@@ -8,7 +8,7 @@ import { now } from '../clock.js';
 import { normalizeCity } from '../cities.js';
 
 export function pickEngine() {
-  if (process.env.ZIDATE_AGENT === 'offline') return mockEngine;
+  if (process.env.PISHI_AGENT === 'offline') return mockEngine;
   return process.env.ANTHROPIC_API_KEY ? claudeEngine : mockEngine;
 }
 
@@ -123,7 +123,7 @@ export async function respond(user, convo, rawText, engine = pickEngine()) {
     const value = parseBasic(pending.key, text);
     if (value === 'minor') {
       user.blocked = 'under18';
-      return say(convo, 'ziDate is only for adults, so I cannot continue. Take care.', null);
+      return say(convo, 'Pishi is only for adults, so I cannot continue. Take care.', null);
     }
     if (value == null) {
       const q = { ...BASICS.find((b) => b.key === pending.key), kind: 'basic', mode: 'self' };

@@ -46,7 +46,7 @@ export default function account(ctx) {
 
   function sendVerify(user) {
     const token = issueToken(user, 'verify');
-    return mailer.send({ to: user.email, subject: 'Confirm your email for ziDate', text: `Hi ${user.name},\n\nConfirm your email so we can tell you when your two people arrive:\n${baseUrl}/#/verify/${token}\n\nIf this was not you, ignore this email.` });
+    return mailer.send({ to: user.email, subject: 'Confirm your email for Pishi', text: `Hi ${user.name},\n\nConfirm your email so we can tell you when your two people arrive:\n${baseUrl}/#/verify/${token}\n\nIf this was not you, ignore this email.` });
   }
 
   function checkPassword(password) {
@@ -122,7 +122,7 @@ export default function account(ctx) {
     const user = Object.values(store.data.users).find((u) => u.email === email && u.password);
     if (user) {
       const t = issueToken(user, 'reset');
-      await mailer.send({ to: user.email, subject: 'Reset your ziDate password', text: `Hi ${user.name},\n\nChoose a new password here (the link works for one hour):\n${baseUrl}/#/reset/${t}\n\nIf you did not ask for this, you can ignore this email.` });
+      await mailer.send({ to: user.email, subject: 'Reset your Pishi password', text: `Hi ${user.name},\n\nChoose a new password here (the link works for one hour):\n${baseUrl}/#/reset/${t}\n\nIf you did not ask for this, you can ignore this email.` });
     }
     // Same answer either way, so this cannot be used to find out who has an account.
     return { body: { ok: true } };
@@ -196,7 +196,7 @@ export default function account(ctx) {
     };
     res.writeHead(200, {
       'Content-Type': 'application/json; charset=utf-8',
-      'Content-Disposition': 'attachment; filename="zidate-my-data.json"',
+      'Content-Disposition': 'attachment; filename="pishi-my-data.json"',
       'Cache-Control': 'no-store',
     });
     res.end(JSON.stringify(data, null, 2));

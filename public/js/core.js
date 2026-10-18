@@ -223,12 +223,12 @@ export function clock(iso) {
 // --- local preferences (best effort; storage can be unavailable) ---
 export const prefs = {
   get(k, d = null) {
-    try { return localStorage.getItem(`zidate:${k}`) ?? d; } catch { return d; }
+    try { return localStorage.getItem(`pishi:${k}`) ?? d; } catch { return d; }
   },
   set(k, v) {
     try {
-      if (v == null || v === '') localStorage.removeItem(`zidate:${k}`);
-      else localStorage.setItem(`zidate:${k}`, v);
+      if (v == null || v === '') localStorage.removeItem(`pishi:${k}`);
+      else localStorage.setItem(`pishi:${k}`, v);
     } catch { /* ignore */ }
   },
 };

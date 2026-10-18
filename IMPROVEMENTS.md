@@ -81,3 +81,9 @@ Asked for: complete the missing components and features, with up to 50 suggestio
 | 68 | Ops | GitHub Actions workflow: unit, API and browser tests, plus a Docker build. | Not run (no repository yet) |
 | 69 | Bug | Pausing mid-week still showed the week's picks. Paused now always wins. | Found by the new browser test |
 | 70 | Bug | Dialog dropdowns started empty, so "Add a line" always failed. Also: match messages now have their own bubble, and the forgot-password page keeps the email you typed. | Found by the new browser test; screenshots |
+
+## Rebrand (71)
+
+| # | Area | What changed | Verified by |
+|---|---|---|---|
+| 71 | Brand | ziDate is now Pishi ("cat" in Farsi): name everywhere, the pink cat logo in the header, welcome page, favicon and app icons, a rose accent colour taken from the logo, and `PISHI_*` environment variables (were `ZIDATE_*`). | Full suite; screenshots |

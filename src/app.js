@@ -106,7 +106,7 @@ export function createApp(store, opts = {}) {
       hub.publish(user.id, 'notification', n);
       const wants = settingsOf(user).email[type];
       if (wants && hub.count(user.id) === 0) {
-        mailer.send({ to: user.email, subject: `ziDate: ${text}`, text: `${text}\n\n${baseUrl}/${link || ''}\n\nYou can change which emails you get under You > Settings.` });
+        mailer.send({ to: user.email, subject: `Pishi: ${text}`, text: `${text}\n\n${baseUrl}/${link || ''}\n\nYou can change which emails you get under You > Settings.` });
       }
       return n;
     },
