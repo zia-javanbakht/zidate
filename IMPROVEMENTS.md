@@ -87,4 +87,4 @@ Asked for: complete the missing components and features, with up to 50 suggestio
 
 | # | Area | What changed | Verified by |
 |---|---|---|---|
-| 72 | Brand | ziDate is now Pishi ("cat" in Farsi): name everywhere, a flat vector cat logo (logo.svg, plus a head-only mark.svg for small sizes) in the header, welcome page, favicon and app icons, a rose accent colour matching it, and `PISHI_*` environment variables (were `ZIDATE_*`). | Full suite; screenshots |
+| 72 | Brand | ziDate is now Pishi ("cat" in Farsi): name everywhere, a flat vector cat logo (logo.svg) in the header, welcome page, favicon and app icons, a rose accent colour matching it, and `PISHI_*` environment variables (were `ZIDATE_*`). | Full suite; screenshots |

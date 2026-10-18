@@ -1,6 +1,6 @@
 // Minimal offline support: network first for the app shell, cached copy when offline. The API is never cached.
-const CACHE = 'pishi-v4';
-const SHELL = ['/', '/style.css', '/favicon.png', '/mark.svg', '/logo.svg', '/manifest.webmanifest', '/js/main.js', '/js/core.js', '/js/auth.js', '/js/talk.js', '/js/people.js', '/js/profile.js', '/js/settings.js'];
+const CACHE = 'pishi-v5';
+const SHELL = ['/', '/style.css', '/favicon.png', '/logo.svg', '/manifest.webmanifest', '/js/main.js', '/js/core.js', '/js/auth.js', '/js/talk.js', '/js/people.js', '/js/profile.js', '/js/settings.js'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
