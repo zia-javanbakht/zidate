@@ -117,3 +117,9 @@ Asked for: guide people to complete both profiles; keep a much more detailed rec
 |---|---|---|---|
 | 88 | Profile | Photos on a profile are shown one at a time, full width: swipe, tap the left or right edge, use the arrows (on devices with a mouse) or the dots, or the arrow keys. A "2 / 3" counter shows where you are. | Browser test |
 | 89 | Profile | People are asked for at least three photos (not required): empty slots and a short tip on the Photos card, a "you have 1" step in the profile guide, and a matchmaker nudge that changes once there is one. | Unit and browser tests; screenshots |
+
+## Logo (90)
+
+| # | Area | What changed | Verified by |
+|---|---|---|---|
+| 90 | Brand | The logo is now an 80s-style pixel cat, hand-drawn on a 32 x 32 grid: a sitting cat whose raised tail curls over its head into a question mark. Same rose palette plus a pale pink for whiskers and eye glints, a one-colour version (logo-mono.svg), and the favicon and app icons rendered at whole-pixel multiples so they stay crisp. The header and welcome page show it at 32 and 128 px for the same reason. | Rendered at 512, 192, 128, 64 and 32 px |
