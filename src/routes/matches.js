@@ -33,7 +33,7 @@ export default function matches(ctx) {
     return {
       canAsk: !m.closed && !other.demo && isVerified(user) && !isVerified(other) && !asked[user.id],
       askedThem: Boolean(asked[user.id]),
-      theyAsked: Boolean(asked[other.id]) && !isVerified(user),
+      theyAsked: !m.closed && Boolean(asked[other.id]) && !isVerified(user),
     };
   }
 

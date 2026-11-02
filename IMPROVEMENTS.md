@@ -185,3 +185,4 @@ Asked for: analyse the app, suggest what is missing compared with the five apps 
 |---|---|---|---|---|
 | 119 | 1 | Safety (Bumble request verification) | "Ask to verify" in a conversation: once you are verified, you can ask a match who is not, once per match. They get a notification and a line in the conversation linking to verification, which goes away once they are verified. Demo people and closed conversations cannot be asked; nobody is told if the other person never verifies. | API test |
 | 120 | 2 | Matches | The Verified badge also shows next to a match's name in the Matches list, not only on their card. | Browser test |
+| 121 | 3 | Review | A request to verify stops showing once either person closes the conversation kindly. | API test |

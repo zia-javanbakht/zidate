@@ -382,6 +382,10 @@ test('ask a match to verify: only once, only when you are verified and they are 
   assert.ok(notes.some((n) => n.type === 'verification' && /Ana asked if you would verify/.test(n.text)));
   assert.equal((await b.get(`/api/matches/${mid}`)).data.verify.theyAsked, true);
   assert.equal((await b.get(`/api/matches/${mid}`)).data.verify.canAsk, false, 'Ben is not verified, so he cannot ask back');
+  // A closed conversation stops asking.
+  s.store.data.matches[decodeURIComponent(mid)].closed = { by: A.id, at: new Date().toISOString() };
+  assert.equal((await b.get(`/api/matches/${mid}`)).data.verify.theyAsked, false);
+  delete s.store.data.matches[decodeURIComponent(mid)].closed;
   // Once Ben is verified, the request is answered and disappears.
   const ben = s.store.data.users[B.id];
   ben.photos = [{ id: 'p-ben.png' }];
