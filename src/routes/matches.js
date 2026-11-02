@@ -9,6 +9,7 @@ import { askNow } from '../agent/index.js';
 import { screenMessage } from '../moderation.js';
 import { now } from '../clock.js';
 import { noteMessage } from '../signals.js';
+import { isVerified } from '../verification.js';
 
 export default function matches(ctx) {
   const { store, route, HttpError, hub, notify, serial } = ctx;
@@ -24,6 +25,17 @@ export default function matches(ctx) {
     // A like on one line or photo opens the conversation, quoted above the note.
     ...(x.about ? { about: x.about.kind === 'photo' ? { photo: `/api/photos/${x.about.photoId}` } : { prompt: x.about.prompt, text: x.about.text } } : {}),
   });
+
+  // Ask a match to verify their photos (Bumble's "request verification"). Only verified people
+  // can ask, once per match; the answer is the badge itself, so nobody is told they refused.
+  function verifyAsk(m, user, other) {
+    const asked = m.verifyAsked || {};
+    return {
+      canAsk: !m.closed && !other.demo && isVerified(user) && !isVerified(other) && !asked[user.id],
+      askedThem: Boolean(asked[user.id]),
+      theyAsked: Boolean(asked[other.id]) && !isVerified(user),
+    };
+  }
 
   route('GET', '/api/matches', async ({ user }) => {
     const list = Object.values(store.data.matches)
@@ -76,6 +88,7 @@ export default function matches(ctx) {
         closeLines: CLOSE_LINES,
         date: (() => { const d = activePlan(store, user.id, m.id); return d ? planView(d, settingsOf(user).timeZone) : null; })(),
         trustedContact: settingsOf(user).trustedContact?.name || null,
+        verify: other ? verifyAsk(m, user, other) : null,
       },
     };
   }, { saves: true });
@@ -130,6 +143,19 @@ export default function matches(ctx) {
       notify(other, { type: 'message', text: `${user.name} closed your conversation kindly.`, link: `#/match/${encodeURIComponent(m.id)}` });
     }
     return { body: { message: view(msg, user) } };
+  });
+
+  route('POST', '/api/matches/:id/ask-verify', async ({ user, params }) => {
+    const m = getMatch(user, params.id);
+    const other = otherOf(m, user);
+    if (!other) throw new HttpError(404, 'Not found.');
+    const v = verifyAsk(m, user, other);
+    if (v.askedThem) throw new HttpError(409, `You have already asked ${other.name}.`);
+    if (!isVerified(user)) throw new HttpError(403, 'Verify your own photos first, then you can ask.');
+    if (!v.canAsk) throw new HttpError(400, `${other.name} cannot be asked right now.`);
+    m.verifyAsked = { ...m.verifyAsked, [user.id]: now().toISOString() };
+    notify(other, { type: 'verification', text: `${user.name} asked if you would verify your photos. It takes a minute.`, link: '#/profile/verification' });
+    return { body: { verify: verifyAsk(m, user, other) } };
   });
 
   // "Did you meet?" from the conversation itself, any time. "Once was enough" hands over to

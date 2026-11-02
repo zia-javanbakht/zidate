@@ -365,3 +365,27 @@ test('demo review: demo people answer a note, never hold a week or nag, and cann
   clock.reset();
   await s.close();
 });
+
+test('ask a match to verify: only once, only when you are verified and they are not', async () => {
+  const { s, a, b, A, B, mid } = await matched();
+  const ask = () => a.post(`/api/matches/${mid}/ask-verify`);
+  assert.equal((await a.get(`/api/matches/${mid}`)).data.verify.canAsk, false);
+  assert.equal((await ask()).status, 403, 'not verified yourself');
+  // Ana verifies (as if a moderator approved her selfie).
+  const ana = s.store.data.users[A.id];
+  ana.photos = [{ id: 'p-ana.png' }];
+  ana.verification = { status: 'verified', photoIds: ['p-ana.png'], attempts: [] };
+  assert.equal((await a.get(`/api/matches/${mid}`)).data.verify.canAsk, true);
+  assert.equal((await ask()).status, 200);
+  assert.equal((await ask()).status, 409, 'once per match');
+  const notes = (await b.get('/api/notifications')).data.notifications;
+  assert.ok(notes.some((n) => n.type === 'verification' && /Ana asked if you would verify/.test(n.text)));
+  assert.equal((await b.get(`/api/matches/${mid}`)).data.verify.theyAsked, true);
+  assert.equal((await b.get(`/api/matches/${mid}`)).data.verify.canAsk, false, 'Ben is not verified, so he cannot ask back');
+  // Once Ben is verified, the request is answered and disappears.
+  const ben = s.store.data.users[B.id];
+  ben.photos = [{ id: 'p-ben.png' }];
+  ben.verification = { status: 'verified', photoIds: ['p-ben.png'], attempts: [] };
+  assert.equal((await b.get(`/api/matches/${mid}`)).data.verify.theyAsked, false);
+  await s.close();
+});

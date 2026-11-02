@@ -249,7 +249,7 @@ export async function matches() {
       h('a', { href: `#/match/${encodeURIComponent(m.id)}` },
         h('div', { class: 'who' }, avatar(m.person),
           h('div', { style: 'min-width:0' },
-            h('div', { class: 'name' }, m.person.name),
+            h('div', { class: 'name' }, m.person.name, m.person.verified ? h('span', { class: 'verified small', title: 'Their selfie matched their photos' }, 'Verified') : null),
             h('div', { class: 'preview' }, m.closed ? 'Closed' : m.last ? `${m.last.mine ? 'You: ' : ''}${m.last.text}` : 'Say hello'))),
         h('div', { class: 'stack', style: 'text-align:right' },
           h('div', { class: 'when' }, ago(m.last?.at || m.createdAt)),
@@ -443,9 +443,23 @@ export async function thread(id) {
     toast(v.report ? 'Unmatched and reported. Thank you for telling us.' : 'Unmatched.');
     location.hash = '#/matches';
   };
+  // Ask a match to verify, once, when you are verified and they are not.
+  const verifyBtn = data.verify?.canAsk ? h('button', { class: 'link small', type: 'button' }, 'Ask to verify') : null;
+  if (verifyBtn) verifyBtn.onclick = async () => {
+    try {
+      await api('POST', `/api/matches/${encodeURIComponent(id)}/ask-verify`);
+      verifyBtn.remove();
+      toast(`Asked. ${name} will see a Verified badge once they do it.`);
+    } catch (ex) {
+      toast(ex.message);
+    }
+  };
+  const theyAsked = data.verify?.theyAsked
+    ? h('p', { class: 'muted small center verify-asked' }, `${name} asked if you would verify your photos. `, h('a', { href: '#/profile/verification' }, 'Verify now'))
+    : null;
   render(h('section', { class: 'chat' },
-    h('div', { class: 'section-head' }, h('a', { class: 'back', href: '#/matches' }, '← Matches'), h('div', { class: 'row wrap' }, metBtn, shareBtn, closeBtn, unmatch)),
-    plan,
+    h('div', { class: 'section-head' }, h('a', { class: 'back', href: '#/matches' }, '← Matches'), h('div', { class: 'row wrap' }, metBtn, verifyBtn, shareBtn, closeBtn, unmatch)),
+    plan, theyAsked,
     personCard(data.person), log, data.closed ? null : ice, data.closed ? null : ideas, data.closed ? null : form));
   window.scrollTo(0, document.body.scrollHeight);
 }
