@@ -178,3 +178,10 @@ Asked for: analyse the app, suggest what is missing compared with the five apps 
 | # | Area | What changed | Verified by |
 |---|---|---|---|
 | 118 | Matching | A hidden questionnaire (src/temperament.js): twelve quick-reply questions that place each person on four independent temperaments, Spark (novelty, play), Anchor (steadiness, loyalty), Compass (direction, decisiveness) and Hearth (warmth, empathy). Once matching has started, the matchmaker asks one after each open question, about the temperament it knows least; Claude may add low-confidence hints from open answers. Never shown to anyone, the person included; disclosed on the About page and in the data export. Pairs get a Pishi Fit score (0.5 tempo similarity + 0.3 head-and-heart balance + 0.2 warmth, minus a clash when both lead strongly) that counts for up to a fifth of the match score as both people's answers build up. Demo people have temperaments. | Unit tests |
+
+## Round 5 (119–)
+
+| # | Cycle | Area | What changed | Verified by |
+|---|---|---|---|---|
+| 119 | 1 | Safety (Bumble request verification) | "Ask to verify" in a conversation: once you are verified, you can ask a match who is not, once per match. They get a notification and a line in the conversation linking to verification, which goes away once they are verified. Demo people and closed conversations cannot be asked; nobody is told if the other person never verifies. | API test |
+| 120 | 2 | Matches | The Verified badge also shows next to a match's name in the Matches list, not only on their card. | Browser test |
